@@ -3,7 +3,7 @@ from rest_framework import permissions
 
 class IsAuthorOrReadOnly(permissions.BasePermission):
     """
-    Разрешение на изменение только для автора.
+    Изменение только для автора.
     Остальные могут только просматривать.
     """
 
