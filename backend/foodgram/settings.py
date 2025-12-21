@@ -8,11 +8,11 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Безопасность
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dev-key')
+SECRET_KEY = os.getenv('SECRET_KEY', '-PpGq7VpK5vgk94e-7yTrL1soZMETDoUedrjnbvvPTkN6UrgAI6ViIIRsisFb1wfc5c')
 
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,158.160.19.235,foodgrammchill.webhop.me').split(',')
 
 # Application definition
 INSTALLED_APPS = [
@@ -68,15 +68,15 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'foodgram.wsgi.application'
 
-# Database
+# Database - ФИКСИРОВАННАЯ ЧАСТЬ
 DATABASES = {
     'default': {
-        'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.sqlite3'),
-        'NAME': os.getenv('DB_NAME', BASE_DIR / 'db.sqlite3'),
-        'USER': os.getenv('DB_USER', ''),
-        'PASSWORD': os.getenv('DB_PASSWORD', ''),
-        'HOST': os.getenv('DB_HOST', ''),
-        'PORT': os.getenv('DB_PORT', ''),
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('DB_NAME', 'foodgram'),
+        'USER': os.getenv('DB_USER', 'foodgram_user'),
+        'PASSWORD': os.getenv('DB_PASSWORD', 'afdwMp-85pYexEuTJ27nLfLfxdw'),
+        'HOST': os.getenv('DB_HOST', 'postgres'),
+        'PORT': os.getenv('DB_PORT', '5432'),
     }
 }
 
@@ -155,23 +155,3 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    
-    # Logging
-    LOGGING = {
-        'version': 1,
-        'disable_existing_loggers': False,
-        'handlers': {
-            'file': {
-                'level': 'ERROR',
-                'class': 'logging.FileHandler',
-                'filename': os.path.join(BASE_DIR, 'logs/django_error.log'),
-            },
-        },
-        'loggers': {
-            'django': {
-                'handlers': ['file'],
-                'level': 'ERROR',
-                'propagate': True,
-            },
-        },
-    }
