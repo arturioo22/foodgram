@@ -85,7 +85,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.PASSPHRASE }}
           script: |
-            # Переходим в рабочую директорию
+            # Переходим в рабочую
             cd ~/foodgram
             
             # Обновляем docker-compose.prod.yml
