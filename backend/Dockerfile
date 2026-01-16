@@ -14,6 +14,3 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Копирование кода проекта
 COPY . .
-
-# Точка входа
-ENTRYPOINT ["sh", "./docker-entrypoint.sh"]
