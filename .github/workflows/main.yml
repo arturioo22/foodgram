@@ -59,8 +59,17 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       
+      - name: Check for frontend Dockerfile
+        id: check_frontend
+        run: |
+          if [ -f "./frontend/Dockerfile" ]; then
+            echo "frontend_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "frontend_exists=false" >> $GITHUB_OUTPUT
+          fi
+      
       - name: Build and push frontend
-        if: exists('./frontend/Dockerfile')  # ← Проверяем, есть ли фронтенд
+        if: steps.check_frontend.outputs.frontend_exists == 'true'
         uses: docker/build-push-action@v4
         with:
           context: ./frontend
