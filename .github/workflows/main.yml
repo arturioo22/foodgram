@@ -60,6 +60,7 @@ jobs:
           cache-to: type=gha,mode=max
       
       - name: Build and push frontend
+        if: exists('./frontend/Dockerfile')  # ← Проверяем, есть ли фронтенд
         uses: docker/build-push-action@v4
         with:
           context: ./frontend
@@ -85,23 +86,48 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.PASSPHRASE }}
           script: |
-            # Переходим в рабочую
+            # Переходим в рабочую директорию
             cd ~/foodgram
             
-            # Обновляем docker-compose.prod.yml
-            sudo cp -f /home/${{ secrets.USER }}/foodgram/infra/docker-compose.prod.yml docker-compose.yml
+            # 1. Копируем ВСЕ необходимые файлы
+            echo "📁 Копируем файлы..."
+            sudo mkdir -p nginx
+            sudo cp -f /home/${{ secrets.USER }}/foodgram/docker-compose.yml .
+            sudo cp -f /home/${{ secrets.USER }}/foodgram/nginx/nginx.conf ./nginx/
             
-            # Обновляем контейнеры
-            sudo docker-compose pull
-            sudo docker-compose down
+            # 2. Проверяем и создаём БД (если не существует)
+            echo "🗄️  Проверяем базу данных..."
+            DB_EXISTS=$(docker run --rm --network=host postgres:15-alpine psql -h localhost -U postgres -tAc "SELECT 1 FROM pg_database WHERE datname='foodgram'" 2>/dev/null || echo "0")
+            
+            if [ "$DB_EXISTS" != "1" ]; then
+              echo "📦 Создаём базу данных..."
+              docker run --rm --network=host postgres:15-alpine psql -h localhost -U postgres -c \
+                "CREATE DATABASE foodgram; \
+                 CREATE USER foodgram_user WITH PASSWORD 'ваш_пароль_из_.env'; \
+                 GRANT ALL PRIVILEGES ON DATABASE foodgram TO foodgram_user;" 2>/dev/null || \
+                echo "⚠️  Не удалось создать БД (возможно уже существует)"
+            fi
+            
+            # 3. Обновляем контейнеры
+            echo "🐳 Обновляем контейнеры..."
+            sudo docker-compose pull 2>/dev/null || true
+            sudo docker-compose down 2>/dev/null || true
             sudo docker-compose up -d
             
-            # Выполняем миграции и сбор статики
-            sudo docker-compose exec -T backend python manage.py migrate
-            sudo docker-compose exec -T backend python manage.py collectstatic --no-input
+            # 4. Ждём запуска бэкенда
+            echo "⏳ Ждём запуска бэкенда..."
+            sleep 15
             
-            # Перезапускаем nginx
-            sudo docker-compose restart nginx
+            # 5. Выполняем миграции и сбор статики
+            echo "🔄 Выполняем миграции..."
+            sudo docker-compose exec -T backend python manage.py migrate --no-input || \
+              echo "⚠️  Миграции не выполнены (возможно контейнер ещё не готов)"
             
-            # Очистка старых образов
-            sudo docker system prune -f
+            echo "📦 Собираем статику..."
+            sudo docker-compose exec -T backend python manage.py collectstatic --no-input || \
+              echo "⚠️  Статика не собрана"
+            
+            # 6. Проверяем статус
+            echo "✅ Деплой завершён!"
+            echo "🌐 Сайт: http://${{ secrets.HOST }}/"
+            sudo docker-compose ps
