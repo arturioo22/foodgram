@@ -142,7 +142,7 @@ jobs:
             sudo docker-compose exec -T backend python manage.py collectstatic --no-input || \
               echo "⚠️  Статика не собрана"
             
-            # 6. Проверяем статус
+
             echo "✅ Деплой завершён!"
             echo "🌐 Сайт: http://${{ secrets.HOST }}/"
             sudo docker-compose ps
