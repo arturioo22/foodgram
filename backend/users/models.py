@@ -11,7 +11,7 @@ from django.core.validators import RegexValidator
 
 
 class CustomUserManager(UserManager):
-    """Кастомный менеджер для поддержки аутентификации по email."""
+    """Кастомный менеджер поддержки аутентификации по email."""
 
     def get_by_natural_key(self, username):
         return self.get(
