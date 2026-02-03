@@ -85,9 +85,9 @@ jobs:
 
   # Этап 3: Деплой на сервер
   deploy:
-    runs-on: ubuntu-latest
-    needs: build-and-push
-    timeout-minutes: 5
+    runs-on: ubuntu-latest  # ← ДОБАВЬТЕ ЭТУ СТРОКУ
+    needs: build-and-push   # ← Убедитесь, что это есть
+    timeout-minutes: 15     # ← Рекомендую добавить
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -104,56 +104,59 @@ jobs:
             # Переходим в рабочую директорию
             cd ~/foodgram
             
-            # 1. Копируем файлы из ПРАВИЛЬНОГО пути
+            # 1. Копируем файлы
             echo "📁 Копируем файлы..."
             sudo mkdir -p nginx
             
-            # Правильный путь в GitHub Actions: /github/workspace/
+            # docker-compose.yml в корне
             sudo cp -f /github/workspace/docker-compose.yml .
+            
+            # Используем nginx.conf из папки nginx/ (а не infra/)
             sudo cp -f /github/workspace/nginx/nginx.conf ./nginx/
             
-            # 2. Проверяем и создаём БД с РЕАЛЬНЫМ паролем
+            # 2. Проверяем и создаём БД (упрощённо)
             echo "🗄️  Проверяем базу данных..."
-            DB_EXISTS=$(docker run --rm --network=host postgres:15-alpine psql -h localhost -U postgres -tAc "SELECT 1 FROM pg_database WHERE datname='foodgram'" 2>/dev/null || echo "0")
             
-            if [ "$DB_EXISTS" != "1" ]; then
-              echo "📦 Создаём базу данных..."
-              # Используем ваш пароль из .env: afdwMp-85pYexEuTJ27nLfLfxdw
-              docker run --rm --network=host postgres:15-alpine psql -h localhost -U postgres -c \
-                "CREATE DATABASE foodgram; \
-                 CREATE USER foodgram_user WITH PASSWORD 'afdwMp-85pYexEuTJ27nLfLfxdw'; \
-                 GRANT ALL PRIVILEGES ON DATABASE foodgram TO foodgram_user;" 2>/dev/null || \
-                echo "⚠️  Не удалось создать БД (возможно уже существует)"
-            fi
+            # Простой способ - просто пытаемся создать, если не существует
+            docker run --rm --network=host postgres:15-alpine psql -h localhost -U postgres \
+              -c "CREATE DATABASE foodgram;" 2>/dev/null || true
+              
+            docker run --rm --network=host postgres:15-alpine psql -h localhost -U postgres \
+              -c "CREATE USER foodgram_user WITH PASSWORD 'afdwMp-85pYexEuTJ27nLfLfxdw';" 2>/dev/null || true
+              
+            docker run --rm --network=host postgres:15-alpine psql -h localhost -U postgres \
+              -c "GRANT ALL PRIVILEGES ON DATABASE foodgram TO foodgram_user;" 2>/dev/null || true
             
-            # 3. Обновляем контейнеры
-            echo "🐳 Обновляем контейнеры..."
-            sudo docker-compose pull 2>/dev/null || true
+            # 3. Запускаем контейнеры
+            echo "🐳 Запускаем контейнеры..."
+            
+            # Сначала останавливаем старые (если есть)
             sudo docker-compose down 2>/dev/null || true
-            sudo docker-compose up -d
             
-            # 4. Ждём запуска бэкенда
+            # Запускаем заново
+            sudo docker-compose up -d --build
+            
+            # 4. Ждём и выполняем миграции
             echo "⏳ Ждём запуска бэкенда..."
-            sleep 15
+            sleep 20
             
-            # 5. Выполняем миграции и сбор статики (с повторной попыткой)
             echo "🔄 Выполняем миграции..."
-            for i in {1..3}; do
-              sudo docker-compose exec -T backend python manage.py migrate --no-input && break || sleep 10
+            # Несколько попыток
+            for i in {1..5}; do
+              if sudo docker-compose exec -T backend python manage.py migrate --no-input 2>/dev/null; then
+                echo "✅ Миграции выполнены"
+                break
+              else
+                echo "🔄 Попытка $i из 5..."
+                sleep 10
+              fi
             done
             
             echo "📦 Собираем статику..."
             sudo docker-compose exec -T backend python manage.py collectstatic --no-input
             
-            # 6. Создаём суперпользователя (если нужно)
-            echo "👑 Создаём суперпользователя..."
-            sudo docker-compose exec -T backend python manage.py createsuperuser \
-              --noinput \
-              --username admin \
-              --email admin@example.com \
-              2>/dev/null || echo "Суперпользователь уже существует"
-            
             echo "✅ Деплой завершён!"
             echo "🌐 Сайт доступен по адресу: http://${{ secrets.HOST }}/"
             echo "📊 Статус контейнеров:"
-            sudo docker-compose ps
+            sudo docker-compose ps || echo "docker-compose ps не сработал, проверяем напрямую..."
+            sudo docker ps
