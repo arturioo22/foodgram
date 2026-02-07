@@ -85,78 +85,124 @@ jobs:
 
   # Этап 3: Деплой на сервер
   deploy:
-    runs-on: ubuntu-latest  # ← ДОБАВЬТЕ ЭТУ СТРОКУ
-    needs: build-and-push   # ← Убедитесь, что это есть
-    timeout-minutes: 15     # ← Рекомендую добавить
+    runs-on: ubuntu-latest  # <-- ДОБАВЛЕНО ЭТО ПОЛЕ
+    needs: build-and-push
+    timeout-minutes: 15
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
       
-      - name: Deploy to production server
+      - name: Deploy to server
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USER }}
           key: ${{ secrets.SSH_KEY }}
-          passphrase: ${{ secrets.PASSPHRASE }}
-          timeout: 4m
           script: |
-            # Переходим в рабочую директорию
             cd ~/foodgram
             
-            # 1. Копируем файлы...
-            echo "📁 Копируем файлы..."
-            sudo mkdir -p nginx
+            # Создаем директорию nginx если её нет
+            mkdir -p nginx
             
-            # docker-compose.yml в корне
-            sudo cp -f /github/workspace/docker-compose.yml .
+            # Копируем файлы из репозитория
+            # Используем путь откуда Actions развернул код
+            cp -f /home/runner/work/_actions/appleboy/ssh-action@v1.0.0/../${{ github.repository }}/infra/docker-compose.yml . 2>/dev/null || \
+              echo "Пытаемся найти docker-compose.yml в другом месте..."
             
-            # Используем nginx.conf из папки nginx/ (а не infra/)
-            sudo cp -f /github/workspace/nginx/nginx.conf ./nginx/
+            # Альтернативный путь поиска файлов
+            find /home/runner/work -name "docker-compose.yml" -o -name "nginx.conf" | head -10
             
-            # 2. Проверяем и создаём БД (упрощённо)
-            echo "🗄️  Проверяем базу данных..."
-            
-            # Простой способ - просто пытаемся создать, если не существует
-            docker run --rm --network=host postgres:15-alpine psql -h localhost -U postgres \
-              -c "CREATE DATABASE foodgram;" 2>/dev/null || true
+            # Если файлы не найдены, создаем базовые
+            if [ ! -f "docker-compose.yml" ]; then
+              echo "⚠️  docker-compose.yml не найден, создаём базовый"
+              cat > docker-compose.yml << 'EOF'
+            version: '3.8'
+            services:
+              db:
+                image: postgres:13
+                volumes:
+                  - postgres_data:/var/lib/postgresql/data
+                env_file:
+                  - .env
               
-            docker run --rm --network=host postgres:15-alpine psql -h localhost -U postgres \
-              -c "CREATE USER foodgram_user WITH PASSWORD 'afdwMp-85pYexEuTJ27nLfLfxdw';" 2>/dev/null || true
+              backend:
+                image: ${{ secrets.DOCKERHUB_USERNAME }}/foodgram-backend:latest
+                depends_on:
+                  - db
+                command: >
+                  sh -c "python manage.py migrate &&
+                         python manage.py collectstatic --noinput &&
+                         gunicorn foodgram.wsgi:application --bind 0.0.0.0:8000"
+                volumes:
+                  - static_volume:/app/static
+                  - media_volume:/app/media
+                env_file:
+                  - .env
               
-            docker run --rm --network=host postgres:15-alpine psql -h localhost -U postgres \
-              -c "GRANT ALL PRIVILEGES ON DATABASE foodgram TO foodgram_user;" 2>/dev/null || true
+              nginx:
+                image: nginx:1.21
+                ports:
+                  - "80:80"
+                volumes:
+                  - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+                  - static_volume:/app/static
+                depends_on:
+                  - backend
             
-            # 3. Запускаем контейнеры
-            echo "🐳 Запускаем контейнеры..."
+            volumes:
+              postgres_data:
+              static_volume:
+              media_volume:
+            EOF
+            fi
             
-            # Сначала останавливаем старые (если есть)
-            sudo docker-compose down 2>/dev/null || true
+            if [ ! -f "nginx/default.conf" ]; then
+              echo "⚠️  nginx.conf не найден, создаём базовый"
+              mkdir -p nginx
+              cat > nginx/default.conf << 'EOF'
+            server {
+                listen 80;
+                server_name _;
+                
+                location /static/ {
+                    alias /app/static/;
+                }
+                
+                location /media/ {
+                    alias /app/media/;
+                }
+                
+                location / {
+                    proxy_pass http://backend:8000;
+                    proxy_set_header Host $host;
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto $scheme;
+                }
+            }
+            EOF
+            fi
             
-            # Запускаем заново
-            sudo docker-compose up -d --build
+            # Обновляем .env файл с секретами
+            cat > .env << EOF
+            DB_ENGINE=django.db.backends.postgresql
+            DB_NAME=${{ secrets.DB_NAME }}
+            DB_USER=${{ secrets.DB_USER }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            DB_HOST=db
+            DB_PORT=5432
+            SECRET_KEY=${{ secrets.SECRET_KEY }}
+            DEBUG=False
+            ALLOWED_HOSTS=${{ secrets.HOST }}
+            EOF
             
-            # 4. Ждём и выполняем миграции
-            echo "⏳ Ждём запуска бэкенда..."
-            sleep 20
+            # Останавливаем старые контейнеры и запускаем новые
+            docker-compose down
+            docker-compose pull
+            docker-compose up -d
             
-            echo "🔄 Выполняем миграции..."
-            # Несколько попыток
-            for i in {1..5}; do
-              if sudo docker-compose exec -T backend python manage.py migrate --no-input 2>/dev/null; then
-                echo "✅ Миграции выполнены"
-                break
-              else
-                echo "🔄 Попытка $i из 5..."
-                sleep 10
-              fi
-            done
-            
-            echo "📦 Собираем статику..."
-            sudo docker-compose exec -T backend python manage.py collectstatic --no-input
-            
-            echo "✅ Деплой завершён!"
-            echo "🌐 Сайт доступен по адресу: http://${{ secrets.HOST }}/"
+            # Ждем запуска и проверяем статус
+            sleep 10
+            echo "✅ Деплой завершен!"
             echo "📊 Статус контейнеров:"
-            sudo docker-compose ps || echo "docker-compose ps не сработал, проверяем напрямую..."
-            sudo docker ps
+            docker-compose ps
