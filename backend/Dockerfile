@@ -14,3 +14,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Копирование кода проекта
 COPY . .
+
+CMD ["sh", "-c", "python manage.py migrate --no-input && python manage.py collectstatic --no-input && gunicorn --bind 0.0.0.0:8000 foodgram.wsgi:application"]
