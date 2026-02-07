@@ -93,6 +93,7 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USER }}
           key: ${{ secrets.SSH_KEY }}
+          passphrase: ${{ secrets.PASSPHRASE }}
           script: |
             # ========== 1. ПОДГОТОВКА ==========
             echo "🚀 Начинаем деплой Foodgram..."
