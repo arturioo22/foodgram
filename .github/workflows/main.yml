@@ -1,12 +1,14 @@
-name: Foodgram CI/CD
+name: Foodgram CI/CD Pipeline
 
 on:
   push:
     branches: [ "main" ]
 
 jobs:
+  # Этап 1: Тестирование
   tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -23,6 +25,7 @@ jobs:
           pip install -r requirements.txt
       
       - name: Run Django tests
+        timeout-minutes: 3
         run: |
           cd backend
           python manage.py test --noinput
@@ -31,35 +34,11 @@ jobs:
           SECRET_KEY: dummy-key-for-tests
           DEBUG: "True"
 
-  build-frontend:
+  # Этап 2: Сборка и отправка в Docker Hub
+  build-and-push:
     runs-on: ubuntu-latest
     needs: tests
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      
-      - name: Login to DockerHub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
-      
-      - name: Build and push frontend
-        uses: docker/build-push-action@v4
-        with:
-          context: ./frontend
-          push: true
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/foodgram-frontend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  build-backend:
-    runs-on: ubuntu-latest
-    needs: tests
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -83,17 +62,20 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # Этап 3: Деплой на сервер
   deploy:
     runs-on: ubuntu-latest
-    needs: [build-frontend, build-backend]
+    needs: build-and-push
+    timeout-minutes: 15
     steps:
-      - name: Deploy to server
+      - name: Deploy to production server
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USER }}
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.PASSPHRASE }}
+          timeout: 10m  # ← ИСПРАВЛЕНО: было script_timeout
           script: |
             # ========== 1. ПОДГОТОВКА ==========
             echo "🚀 Начинаем деплой Foodgram..."
@@ -104,11 +86,10 @@ jobs:
             cat > .env << 'EOF'
             DB_NAME=foodgram
             DB_USER=foodgram_user
-            DB_PASSWORD='afdwMp-85pYexEuTJ27nLfLfxdw'
-            DOCKERHUB_USERNAME=arturioo22
-            SECRET_KEY='-PpGq7VpK5vgk94e-7yTrL1soZMETDoUedrjnbvvPTkN6UrgAI6ViIIRsisFb1wfc5c'
-            ALLOWED_HOSTS='fffoooddgramm.ddns.net,localhost,127.0.0.1'
-            DEBUG=False
+            DB_PASSWORD=afdwMp-85pYexEuTJ27nLfLfxdw
+            SECRET_KEY=-PpGq7VpK5vgk94e-7yTrL1soZMETDoUedrjnbvvPTkN6UrgAI6ViIIRsisFb1wfc5c
+            ALLOWED_HOSTS=fffoooddgramm.ddns.net,localhost,127.0.0.1
+            DEBUG=True
             EOF
             
             # ========== 3. СОЗДАЕМ DOCKER-COMPOSE.YML ==========
@@ -122,24 +103,24 @@ jobs:
                 environment:
                   POSTGRES_DB: foodgram
                   POSTGRES_USER: foodgram_user
-                  POSTGRES_PASSWORD: 'afdwMp-85pYexEuTJ27nLfLfxdw'
+                  POSTGRES_PASSWORD: afdwMp-85pYexEuTJ27nLfLfxdw
                 volumes:
                   - postgres_data:/var/lib/postgresql/data
                 healthcheck:
-                  test: ["CMD-SHELL", "pg_isready -U foodgram_user"]
+                  test: ["CMD-SHELL", "pg_isready -U foodgram_user -d foodgram"]
                   interval: 10s
                   timeout: 5s
                   retries: 5
               
               backend:
-                image: arturioo22/foodgram-backend:latest
+                image: ${{ secrets.DOCKERHUB_USERNAME }}/foodgram-backend:latest
                 environment:
                   DB_HOST: postgres
                   DB_NAME: foodgram
                   DB_USER: foodgram_user
-                  DB_PASSWORD: 'afdwMp-85pYexEuTJ27nLfLfxdw'
-                  SECRET_KEY: '-PpGq7VpK5vgk94e-7yTrL1soZMETDoUedrjnbvvPTkN6UrgAI6ViIIRsisFb1wfc5c'
-                  DEBUG: 'False'
+                  DB_PASSWORD: afdwMp-85pYexEuTJ27nLfLfxdw
+                  SECRET_KEY: -PpGq7VpK5vgk94e-7yTrL1soZMETDoUedrjnbvvPTkN6UrgAI6ViIIRsisFb1wfc5c
+                  DEBUG: 'True'
                   ALLOWED_HOSTS: 'fffoooddgramm.ddns.net,localhost,127.0.0.1'
                 depends_on:
                   postgres:
@@ -149,8 +130,8 @@ jobs:
                   - media_volume:/app/media/
                 command: >
                   sh -c "python manage.py migrate --no-input &&
-                        python manage.py collectstatic --no-input &&
-                        gunicorn --bind 0.0.0.0:8000 foodgram.wsgi:application"
+                         python manage.py collectstatic --no-input &&
+                         gunicorn --bind 0.0.0.0:8000 foodgram.wsgi:application"
               
               nginx:
                 image: nginx:alpine
@@ -197,48 +178,92 @@ jobs:
             
             # ========== 5. ОБНОВЛЕНИЕ ОБРАЗОВ ==========
             echo "📥 Обновляем Docker образы..."
-            docker pull arturioo22/foodgram-backend:latest
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/foodgram-backend:latest
             
-            # ========== 6. ЗАПУСК ==========
-            echo "🐳 Запускаем docker-compose..."
-            
-            # Останавливаем старые контейнеры
+            # ========== 6. ОСТАНОВКА СТАРОГО ==========
+            echo "🛑 Останавливаем старые контейнеры..."
             docker-compose down 2>/dev/null || true
             
-            # Создаем volumes если их нет
-            docker volume create postgres_data 2>/dev/null || true
-            docker volume create static_volume 2>/dev/null || true
-            docker volume create media_volume 2>/dev/null || true
+            # ========== 7. ЗАПУСК БАЗЫ ДАННЫХ ==========
+            echo "🐘 Запускаем PostgreSQL первым..."
+            docker-compose up -d postgres
             
-            # Проверяем синтаксис
-            echo "🔍 Проверяем docker-compose.yml..."
-            if docker-compose config -q; then
-              echo "✅ docker-compose.yml валиден"
-            else
-              echo "❌ Ошибка в docker-compose.yml"
-              exit 1
-            fi
-            
-            # Запускаем
-            docker-compose up -d
-            
-            # ========== 7. ПРОВЕРКА ==========
-            echo "⏳ Ждём запуска..."
+            echo "⏳ Ждём готовности БД (30 секунд)..."
             sleep 30
             
-            echo "🔍 Проверяем контейнеры:"
-            docker-compose ps
-            
-            echo "📝 Логи бэкенда:"
-            docker-compose logs backend --tail 20
-            
-            echo "🌐 Проверка доступности..."
-            if curl -s -f http://localhost/ > /dev/null 2>&1; then
-              echo "✅ Сайт доступен!"
+            # ========== 8. ПРОВЕРКА БАЗЫ ДАННЫХ ==========
+            echo "🔍 Проверяем подключение к БД..."
+            if docker-compose exec postgres psql -U foodgram_user -d foodgram -c "SELECT 1;" 2>&1 | grep -q "1"; then
+              echo "✅ База данных доступна"
             else
-              echo "⚠️  Сайт пока не отвечает, подробные логи:"
-              docker-compose logs
+              echo "❌ Проблема с БД. Очищаем и пробуем снова..."
+              docker-compose down
+              docker volume rm postgres_data 2>/dev/null || true
+              docker-compose up -d postgres
+              sleep 20
+            fi
+            
+            # ========== 9. ЗАПУСК БЭКЕНДА ==========
+            echo "🚀 Запускаем бэкенд..."
+            docker-compose up -d backend
+            
+            echo "⏳ Ждём запуска бэкенда (20 секунд)..."
+            sleep 20
+            
+            # ========== 10. ПРОВЕРКА И ИСПРАВЛЕНИЕ МИГРАЦИЙ ==========
+            echo "🔄 Проверяем миграции..."
+            
+            # Смотрим статус контейнера
+            BACKEND_STATUS=$(docker-compose ps backend --format "{{.Status}}" 2>/dev/null || echo "unknown")
+            echo "Статус бэкенда: $BACKEND_STATUS"
+            
+            # Если контейнер упал, проверяем логи
+            if [[ "$BACKEND_STATUS" == *"Exit"* ]] || [[ "$BACKEND_STATUS" == "unknown" ]]; then
+              echo "⚠️  Бэкенд упал или не запущен. Проверяем логи..."
+              docker-compose logs backend --tail 30 2>/dev/null || echo "Не удалось получить логи"
+              
+              echo "🛠️  Пробуем запустить миграции вручную..."
+              docker-compose run --rm backend python manage.py migrate --no-input 2>&1 || \
+                echo "⚠️  Миграции не удались..."
+              
+              echo "♻️  Перезапускаем бэкенд..."
+              docker-compose up -d backend
+              sleep 15
+            fi
+            
+            # ========== 11. ЗАПУСК NGINX ==========
+            echo "🌐 Запускаем nginx..."
+            docker-compose up -d nginx
+            
+            # ========== 12. ФИНАЛЬНАЯ ПРОВЕРКА ==========
+            echo "⏳ Ждём полного запуска (15 секунд)..."
+            sleep 15
+            
+            echo "🔍 Финальная проверка:"
+            echo "📊 Статус контейнеров:"
+            docker-compose ps 2>/dev/null || echo "Не удалось получить статус"
+            
+            echo "📝 Логи бэкенда (последние 10 строк):"
+            docker-compose logs backend --tail 10 2>/dev/null || echo "Не удалось получить логи"
+            
+            echo "🌐 Проверка доступности API:"
+            if curl -s -f http://localhost:8000/api/ > /dev/null 2>&1; then
+              echo "✅ API доступно"
+            else
+              echo "⚠️  API недоступно"
+            fi
+            
+            echo "🌐 Проверка через Nginx:"
+            if curl -s -f http://localhost/ > /dev/null 2>&1; then
+              echo "✅ Сайт доступен через Nginx!"
+            else
+              echo "⚠️  Сайт пока недоступен"
+              echo "Логи Nginx:"
+              docker-compose logs nginx --tail 10 2>/dev/null || echo "Не удалось получить логи"
             fi
             
             echo ""
-            echo "🎉 Деплой завершён!"
+            echo "🎉 Процесс деплоя завершён!"
+            echo "🌐 Сайт: http://${{ secrets.HOST }}/"
+            echo "🔧 Админка: http://${{ secrets.HOST }}/admin/"
+            echo "📊 API: http://${{ secrets.HOST }}/api/"
