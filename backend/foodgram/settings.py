@@ -12,7 +12,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', '-PpGq7VpK5vgk94e-7yTrL1soZMETDoUedrjnbvvPT
 
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,158.160.19.235,foodgrammchill.webhop.me').split(',')
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,89.169.180.248,fffoooddgramm.ddns.net').split(',')
 
 # Application definition
 INSTALLED_APPS = [
