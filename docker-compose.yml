@@ -1,66 +1,64 @@
-services:
-  postgres:
-    image: postgres:15-alpine
-    restart: always
-    env_file:
-      - .env
-    environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  backend:
-    image: ${DOCKERHUB_USERNAME}/foodgram-backend:latest  # ← Используйте образ из Docker Hub
-    restart: always
-    env_file:
-      - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-    volumes:
-      - static_volume:/app/static/
-      - media_volume:/app/media/
-    # УДАЛИТЕ ports: - "8000:8000" ← Бэкенд должен быть доступен только внутри сети!
-    healthcheck:  # ← Добавьте healthcheck
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    command: >
-      sh -c "python manage.py migrate --no-input &&
-             python manage.py collectstatic --no-input &&
-             gunicorn --bind 0.0.0.0:8000 foodgram.wsgi:application"
-
-  frontend:  # ← ДОБАВЬТЕ этот сервис!
-    image: ${DOCKERHUB_USERNAME}/foodgram-frontend:latest
-    restart: always
-    depends_on:
-      - backend
-
-  nginx:
-    image: nginx:alpine
-    restart: always
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro  # ← Папка nginx/
-      - static_volume:/usr/share/nginx/html/static/  # ← Поменяйте путь!
-      - media_volume:/usr/share/nginx/html/media/     # ← Поменяйте путь!
-    depends_on:
-      backend:
-        condition: service_healthy
-      frontend:
-        condition: service_started
-
-volumes:
-  postgres_data:
-  static_volume:
-  media_volume:
+version: '3.8' 
+ 
+services: 
+  db: 
+    image: postgres:13 
+    container_name: foodgram_db
+    environment: 
+      POSTGRES_USER: ${POSTGRES_USER} 
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD} 
+      POSTGRES_DB: ${POSTGRES_DB}
+    env_file: .env 
+    volumes: 
+      - pg_data:/var/lib/postgresql/data 
+    networks: 
+      - foodgram_network 
+ 
+  backend: 
+    image: arturioo22/foodgram_backend:latest 
+    container_name: foodgram_backend 
+    environment: 
+      - DJANGO_SETTINGS_MODULE=foodgram_backend.settings 
+    ports: 
+      - "9001:9000" 
+    volumes: 
+      - static_volume:/app/collected_static 
+      - media_volume:/app/media
+      - ./.env:/app/.env
+    depends_on: 
+      - db 
+    networks: 
+      - foodgram_network 
+ 
+  frontend: 
+    image: arturioo22/foodgram_frontend:latest 
+    container_name: foodgram_frontend 
+    volumes: 
+      - static_volume:/app/build 
+    command: sh -c "cp -r /app/build/* /app/build/ && npx -y http-server -p 8000 /app/build" 
+    networks: 
+      - foodgram_network
+ 
+  gateway: 
+    image: arturioo22/foodgram_gateway:latest 
+    container_name: foodgram_gateway 
+    ports: 
+      - "9000:80" 
+    volumes: 
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf 
+      - static_volume:/static 
+      - media_volume:/media 
+    depends_on: 
+      - backend 
+      - frontend 
+    networks: 
+      - foodgram_network
+ 
+volumes: 
+  pg_data: 
+  static_volume: 
+  media_volume: 
+ 
+networks: 
+  foodgram_network: 
+    driver: bridge
