@@ -3,13 +3,13 @@ from django.db import models
 from django.core.validators import RegexValidator
 from django.db.models import Q
 
+
 class CustomUserManager(BaseUserManager):
     """Кастомный менеджер поддержки аутентификации по email."""
 
     def get_by_natural_key(self, username):
         return self.get(
-            Q(username=username) |
-            Q(email=username)
+            Q(username=username) | Q(email=username)
         )
 
 
