@@ -18,7 +18,6 @@ from .serializers import (
 )
 from .filters import RecipeFilter, IngredientFilter
 from .pagination import CustomPagination
-from .permissions import IsAuthorOrReadOnly
 
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken

@@ -2,13 +2,12 @@ import base64
 import uuid
 from django.core.files.base import ContentFile
 from rest_framework import serializers
-from django.db.models import Sum
 from django.contrib.auth import authenticate
 from django.utils.translation import gettext_lazy as _
 
 from users.models import User, Follow
 from recipes.models import (
-    Recipe, Ingredient, Tag, IngredientInRecipe, 
+    Recipe, Ingredient, Tag, IngredientInRecipe,
     Favorite, ShoppingCart
 )
 
