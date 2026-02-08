@@ -25,6 +25,7 @@ CORS_ALLOWED_ORIGINS = os.getenv(
 ).split(',')
 
 INSTALLED_APPS = [
+    'users.apps.UsersConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -36,7 +37,6 @@ INSTALLED_APPS = [
     'corsheaders',
     'api.apps.ApiConfig',
     'recipes.apps.RecipesConfig',
-    'users.apps.UsersConfig',
 
 ]
 
