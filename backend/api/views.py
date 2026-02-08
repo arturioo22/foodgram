@@ -9,7 +9,9 @@ from django.db.models import Sum
 from django.http import HttpResponse
 
 from users.models import User, Follow
-from recipes.models import Recipe, Ingredient, Tag, IngredientInRecipe, Favorite, ShoppingCart
+from recipes.models import (
+    Recipe, Ingredient, Tag, IngredientInRecipe, Favorite, ShoppingCart
+)
 from .serializers import (
     CustomUserSerializer, CustomUserCreateSerializer, SubscriptionSerializer,
     RecipeReadSerializer, RecipeWriteSerializer,
@@ -383,7 +385,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def get_link(self, request, pk=None):
         """Получить короткую ссылку на рецепт."""
         try:
-            recipe = Recipe.objects.get(pk=pk)
             link = request.build_absolute_uri(f'/api/recipes/{pk}/')
             return Response({'short-link': link})
         except Recipe.DoesNotExist:
