@@ -34,7 +34,10 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
-    'cats',
+    'api.apps.ApiConfig',
+    'recipes.apps.RecipesConfig',
+    'users.apps.UsersConfig',
+
 ]
 
 MIDDLEWARE = [
@@ -48,7 +51,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'kittygram_backend.urls'
+ROOT_URLCONF = 'foodgram.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -65,7 +68,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'kittygram_backend.wsgi.application'
+WSGI_APPLICATION = 'foodgram.wsgi.application'
 
 if os.getenv('USE_SQLITE', 'False').lower() == 'true':
     DATABASES = {
