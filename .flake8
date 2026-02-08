@@ -1,0 +1,4 @@
+[flake8]
+max-line-length = 119  # увеличить лимит строки
+exclude = migrations,__pycache__,venv
+ignore = W293,W291,W292,E501,F401,F811,E402,E303,F841,W504
