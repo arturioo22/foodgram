@@ -19,11 +19,6 @@ CSRF_TRUSTED_ORIGINS = os.getenv(
     'http://localhost,http://127.0.0.1'
 ).split(',')
 
-CORS_ALLOWED_ORIGINS = os.getenv(
-    'CORS_ALLOWED_ORIGINS',
-    'http://localhost:3000,http://127.0.0.1:3000'
-).split(',')
-
 INSTALLED_APPS = [
     'users.apps.UsersConfig',
     'django.contrib.admin',
@@ -37,7 +32,6 @@ INSTALLED_APPS = [
     'corsheaders',
     'api.apps.ApiConfig',
     'recipes.apps.RecipesConfig',
-
 ]
 
 AUTH_USER_MODEL = 'users.User'
@@ -83,9 +77,9 @@ else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.getenv('POSTGRES_DB', 'foodgram'),
-            'USER': os.getenv('POSTGRES_USER', 'foodgram_user'),
-            'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'afdwMp-85pYexEuTJ27nLfLfxdw'),
+            'NAME': os.getenv('DB_NAME', 'foodgram'),  # Исправлено: DB_NAME вместо POSTGRES_DB
+            'USER': os.getenv('DB_USER', 'foodgram_user'),  # Исправлено: DB_USER вместо POSTGRES_USER
+            'PASSWORD': os.getenv('DB_PASSWORD', 'afdwMp-85pYexEuTJ27nLfLfxdw'),  # Исправлено: DB_PASSWORD вместо POSTGRES_PASSWORD
             'HOST': os.getenv('DB_HOST', 'db'),
             'PORT': os.getenv('DB_PORT', '5432'),
         }
@@ -124,7 +118,6 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
@@ -136,9 +129,6 @@ REST_FRAMEWORK = {
 
 CORS_ALLOWED_ORIGINS = [
     "http://fffoooddgramm.ddns.net",
-    "http://fffoooddgramm.ddns.net",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
-CSRF_TRUSTED_ORIGINS = os.getenv(
-    'CSRF_TRUSTED_ORIGINS', 'http://localhost,http://127.0.0.1').split(',')
