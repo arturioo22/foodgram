@@ -77,7 +77,7 @@ else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.getenv('DB_NAME', 'foodgram'),  # Исправлено: DB_NAME вместо POSTGRES_DB
+            'NAME': os.getenv('DB_NAME', 'foodgram'),
             'USER': os.getenv('DB_USER', 'foodgram_user'),  # Исправлено: DB_USER вместо POSTGRES_USER
             'PASSWORD': os.getenv('DB_PASSWORD', 'afdwMp-85pYexEuTJ27nLfLfxdw'),  # Исправлено: DB_PASSWORD вместо POSTGRES_PASSWORD
             'HOST': os.getenv('DB_HOST', 'db'),
