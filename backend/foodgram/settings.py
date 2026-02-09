@@ -83,9 +83,9 @@ else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.getenv('POSTGRES_DB', 'kittygram'),
-            'USER': os.getenv('POSTGRES_USER', 'kittygram_user'),
-            'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'strong_password'),
+            'NAME': os.getenv('POSTGRES_DB', 'foodgram'),
+            'USER': os.getenv('POSTGRES_USER', 'foodgram_user'),
+            'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'afdwMp-85pYexEuTJ27nLfLfxdw'),
             'HOST': os.getenv('DB_HOST', 'db'),
             'PORT': os.getenv('DB_PORT', '5432'),
         }
