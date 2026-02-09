@@ -78,8 +78,8 @@ else:
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
             'NAME': os.getenv('DB_NAME', 'foodgram'),
-            'USER': os.getenv('DB_USER', 'foodgram_user'),  # Исправлено: DB_USER вместо POSTGRES_USER
-            'PASSWORD': os.getenv('DB_PASSWORD', 'afdwMp-85pYexEuTJ27nLfLfxdw'),  # Исправлено: DB_PASSWORD вместо POSTGRES_PASSWORD
+            'USER': os.getenv('DB_USER', 'foodgram_user'),
+            'PASSWORD': os.getenv('DB_PASSWORD', 'afdwMp-85pYexEuTJ27nLfLfxdw'),
             'HOST': os.getenv('DB_HOST', 'db'),
             'PORT': os.getenv('DB_PORT', '5432'),
         }
