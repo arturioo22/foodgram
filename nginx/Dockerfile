@@ -1,10 +1,14 @@
-FROM nginx:1.22.1
+FROM nginx:1.22.1-alpine
 
-# Копируем конфиг
-COPY nginx.conf /etc/nginx/templates/default.conf.template
+# Удаляем дефолтный конфиг
+RUN rm /etc/nginx/conf.d/default.conf
 
-# Создаем директории
+# Копируем наш конфиг
+COPY nginx.conf /etc/nginx/conf.d/
+
+# Создаем директории для статики
 RUN mkdir -p /static /media
 
-# Устанавливаем права
-RUN chown -R nginx:nginx /static /media
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
