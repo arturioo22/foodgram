@@ -2,15 +2,48 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.core.validators import RegexValidator
 from django.db.models import Q
+from django.utils.translation import gettext_lazy as _
 
 
 class CustomUserManager(BaseUserManager):
     """Кастомный менеджер поддержки аутентификации по email."""
 
+    use_in_migrations = True
+
     def get_by_natural_key(self, username):
         return self.get(
             Q(username=username) | Q(email=username)
         )
+
+    def _create_user(self, email, password, **extra_fields):
+        """Создает и сохраняет пользователя с email и паролем."""
+        if not email:
+            raise ValueError('Email должен быть указан')
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_user(self, email, password=None, **extra_fields):
+        """Создает обычного пользователя."""
+        extra_fields.setdefault('is_staff', False)
+        extra_fields.setdefault('is_superuser', False)
+        return self._create_user(email, password, **extra_fields)
+
+    def create_superuser(self, email, password, **extra_fields):
+        """Создает суперпользователя."""
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('is_active', True)
+
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('Суперпользователь должен иметь is_staff=True.')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError(
+                'Суперпользователь должен иметь is_superuser=True.')
+
+        return self._create_user(email, password, **extra_fields)
 
 
 class User(AbstractUser):
@@ -23,66 +56,69 @@ class User(AbstractUser):
 
     username_validator = RegexValidator(
         regex=r'^[\w.@+-]+\Z',
-        message=(
+        message=_(
             'Имя пользователя может содержать '
             'только буквы, цифры и @/./+/-/_')
     )
 
     email = models.EmailField(
-        'Адрес электронной почты',
+        _('Адрес электронной почты'),
         max_length=254,
         unique=True,
         blank=False,
         null=False,
-        help_text='Обязательное поле. Введите действующий email адрес.'
+        help_text=_('Обязательное поле. Введите действующий email адрес.')
     )
 
     username = models.CharField(
-        'Имя пользователя',
+        _('Имя пользователя'),
         max_length=150,
         unique=True,
         validators=[username_validator],
-        help_text=(
+        help_text=_(
             'Обязательное поле. Не более 150 символов. '
             'Только буквы, цифры и @/./+/-/_.'
         ),
         error_messages={
-            'unique': 'Пользователь с таким именем уже существует.',
+            'unique': _('Пользователь с таким именем уже существует.'),
         },
     )
 
     first_name = models.CharField(
-        'Имя',
+        _('Имя'),
         max_length=150,
         blank=False,
         null=False,
-        help_text='Введите ваше имя (обязательно).'
+        help_text=_('Введите ваше имя (обязательно).')
     )
 
     last_name = models.CharField(
-        'Фамилия',
+        _('Фамилия'),
         max_length=150,
         blank=False,
         null=False,
-        help_text='Введите вашу фамилию (обязательно).'
+        help_text=_('Введите вашу фамилию (обязательно).')
     )
 
     avatar = models.ImageField(
-        'Аватар',
+        _('Аватар'),
         upload_to='avatars/',
         blank=True,
         null=True,
-        help_text='Загрузите изображение для аватара (необязательно).'
+        help_text=_('Загрузите изображение для аватара (необязательно).')
     )
 
     date_joined = models.DateTimeField(
-        'Дата регистрации',
+        _('Дата регистрации'),
         auto_now_add=True
     )
 
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['username', 'first_name', 'last_name']
+
     class Meta:
-        verbose_name = 'Пользователь'
-        verbose_name_plural = 'Пользователи'
+        verbose_name = _('Пользователь')
+        verbose_name_plural = _('Пользователи')
         ordering = ['username']
         constraints = [
             models.UniqueConstraint(
@@ -117,24 +153,24 @@ class Follow(models.Model):
         User,
         on_delete=models.CASCADE,
         related_name='follower',
-        verbose_name='Подписчик'
+        verbose_name=_('Подписчик')
     )
 
     author = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
         related_name='following',
-        verbose_name='Автор'
+        verbose_name=_('Автор')
     )
 
     created = models.DateTimeField(
-        'Дата подписки',
+        _('Дата подписки'),
         auto_now_add=True
     )
 
     class Meta:
-        verbose_name = 'Подписка'
-        verbose_name_plural = 'Подписки'
+        verbose_name = _('Подписка')
+        verbose_name_plural = _('Подписки')
         ordering = ['-created']
         constraints = [
             models.UniqueConstraint(
@@ -144,7 +180,7 @@ class Follow(models.Model):
             models.CheckConstraint(
                 check=~models.Q(user=models.F('author')),
                 name='prevent_self_follow',
-                violation_error_message='Нельзя подписаться на самого себя.'
+                violation_error_message=_('Нельзя подписаться на самого себя.')
             )
         ]
 
@@ -153,11 +189,9 @@ class Follow(models.Model):
 
     def clean(self):
         """Дополнительная валидация на уровне модели."""
-
         from django.core.exceptions import ValidationError
-
         if self.user == self.author:
-            raise ValidationError('Нельзя подписаться на самого себя.')
+            raise ValidationError(_('Нельзя подписаться на самого себя.'))
 
         super().clean()
 
