@@ -152,7 +152,7 @@ jobs:
           username: ${{ secrets.USER }}
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.PASSPHRASE }}
-          source: "docker-compose.yml,docker-compose.production.yml,nginx/nginx.conf,.env,.env.production"
+          source: "docker-compose.yml,docker-compose.production.yml,nginx/nginx.conf,.env,.env.production,data"
           target: "foodgram/"
 
       - name: Deploy to server
