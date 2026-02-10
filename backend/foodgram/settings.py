@@ -12,12 +12,26 @@ SECRET_KEY = os.getenv('SECRET_KEY', get_random_secret_key())
 
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
+# ВАЖНО: Добавьте 'backend' для внутренних запросов от Nginx
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
+if 'fffoooddgramm.ddns.net' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('fffoooddgramm.ddns.net')
+if 'backend' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('backend')
+if 'localhost' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('localhost')
+if '127.0.0.1' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('127.0.0.1')
 
+# ВАЖНО: Добавьте ваш домен в CSRF_TRUSTED_ORIGINS
 CSRF_TRUSTED_ORIGINS = os.getenv(
     'CSRF_TRUSTED_ORIGINS',
     'http://localhost,http://127.0.0.1'
 ).split(',')
+if 'http://fffoooddgramm.ddns.net' not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append('http://fffoooddgramm.ddns.net')
+if 'https://fffoooddgramm.ddns.net' not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append('https://fffoooddgramm.ddns.net')
 
 INSTALLED_APPS = [
     'users.apps.UsersConfig',
@@ -29,7 +43,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework.authtoken',
-    'corsheaders',
+    'corsheaders',  # Должен быть перед другими apps
     'api.apps.ApiConfig',
     'recipes.apps.RecipesConfig',
 ]
@@ -37,7 +51,7 @@ INSTALLED_APPS = [
 AUTH_USER_MODEL = 'users.User'
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # Должен быть как можно выше
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -48,6 +62,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'foodgram.urls'
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -121,14 +136,62 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',  # Добавлено для CSRF
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
     ],
 }
 
+# ВАЖНО: Настройки CORS
+CORS_ALLOW_ALL_ORIGINS = DEBUG  # Только для разработки
 CORS_ALLOWED_ORIGINS = [
     "http://fffoooddgramm.ddns.net",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost",
+    "http://127.0.0.1",
+]
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+CORS_EXPOSE_HEADERS = [
+    'set-cookie',
+    'authorization',
+]
+
+# Настройки сессии для CSRF
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = False  # Должно быть False для доступа через JS
+CSRF_USE_SESSIONS = False
+CSRF_COOKIE_SECURE = not DEBUG  # True в production
+SESSION_COOKIE_SECURE = not DEBUG  # True в production
+
+# Если фронтенд на другом порту/домене
+CSRF_TRUSTED_ORIGINS = [
+    'http://fffoooddgramm.ddns.net',
+    'https://fffoooddgramm.ddns.net',
+    'http://localhost',
+    'http://127.0.0.1',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
 ]
