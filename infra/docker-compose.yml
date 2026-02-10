@@ -2,23 +2,23 @@ version: '3.8'
 
 services:
   db:
-    image: postgres:15
+    image: postgres:13
     container_name: foodgram_db_dev
     environment:
       POSTGRES_DB: foodgram_dev
       POSTGRES_USER: foodgram_user
       POSTGRES_PASSWORD: dev_password
-      POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - "5432:5432"
     volumes:
       - postgres_data_dev:/var/lib/postgresql/data
     networks:
       - foodgram_network_dev
-    restart: unless-stopped
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: foodgram_backend_dev
     command: >
       sh -c "python manage.py migrate &&
@@ -39,15 +39,15 @@ services:
       - SECRET_KEY=dev-secret-key-change-in-production
       - DEBUG=True
       - ALLOWED_HOSTS=localhost,127.0.0.1,backend
-      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
     depends_on:
       - db
     networks:
       - foodgram_network_dev
-    restart: unless-stopped
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     container_name: foodgram_frontend_dev
     volumes:
       - ./frontend:/app
@@ -61,7 +61,6 @@ services:
       - backend
     networks:
       - foodgram_network_dev
-    restart: unless-stopped
 
 volumes:
   postgres_data_dev:
