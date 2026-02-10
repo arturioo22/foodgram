@@ -1,13 +1,13 @@
 # Stage 1: Build
-FROM node:18-alpine as build
+FROM node:18-alpine AS build
 
 WORKDIR /app
 
-# Кэширование зависимостей
-COPY package*.json ./
-RUN npm ci --silent
+# Копируем package.json первыми для лучшего кэширования
+COPY package.json package-lock.json ./
+RUN npm install --silent
 
-# Копирование исходного кода
+# Копируем остальные файлы
 COPY . .
 
 # Сборка приложения
@@ -18,13 +18,12 @@ RUN npm run build
 # Stage 2: Serve
 FROM nginx:alpine
 
-# Копирование собранного приложения
+# Копируем собранное приложение в nginx
 COPY --from=build /app/build /usr/share/nginx/html
 
-# Базовая конфигурация nginx для SPA
+# Копируем конфигурацию nginx для SPA
 COPY nginx-spa.conf /etc/nginx/conf.d/default.conf
 
-# Открываем порт 80
 EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]
