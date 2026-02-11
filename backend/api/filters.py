@@ -42,7 +42,7 @@ class RecipeFilter(filters.FilterSet):
             limit = self.request.query_params.get('limit')
             if limit == '999' or limit == '100':
                 return Recipe.objects.none()
-    
+
             return queryset.filter(shopping_cart__user=user).distinct()
         return queryset
 
