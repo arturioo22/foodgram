@@ -107,7 +107,7 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/foodgram_frontend:latest
 
-  # Сборка и публикация Docker-образа для nginx gateway
+  # Сборка и публикация Docker-образа
   build_and_push_gateway:
     runs-on: ubuntu-latest
     needs: tests
