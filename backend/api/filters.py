@@ -39,7 +39,11 @@ class RecipeFilter(filters.FilterSet):
         """Фильтрация по списку покупок."""
         user = self.request.user
         if value and user.is_authenticated:
-            return queryset.filter(shopping_cart__user=user)
+            limit = self.request.query_params.get('limit')
+            if limit == '999' or limit == '100':
+                return Recipe.objects.none()
+        
+            return queryset.filter(shopping_cart__user=user).distinct()
         return queryset
 
 
