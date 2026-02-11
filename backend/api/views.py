@@ -394,6 +394,18 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+    @action(
+        detail=False,
+        methods=['get'],
+        permission_classes=[IsAuthenticated],
+        url_path='shopping_cart/count'
+    )
+    def shopping_cart_count(self, request):
+        """Получить количество рецептов в корзине."""
+        user = request.user
+        count = ShoppingCart.objects.filter(user=user).count()
+        return Response({'count': count})
+
 
 class IngredientViewSet(mixins.ListModelMixin,
                         mixins.RetrieveModelMixin,
@@ -417,16 +429,3 @@ class TagViewSet(mixins.ListModelMixin,
     serializer_class = TagSerializer
     pagination_class = None
     permission_classes = [AllowAny]
-
-
-@action(
-    detail=False,
-    methods=['get'],
-    permission_classes=[IsAuthenticated],
-    url_path='shopping_cart/count'
-)
-def shopping_cart_count(self, request):
-    """Получить количество рецептов в корзине."""
-    user = request.user
-    count = ShoppingCart.objects.filter(user=user).count()
-    return Response({'count': count})
