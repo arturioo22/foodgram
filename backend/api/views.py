@@ -418,6 +418,7 @@ class TagViewSet(mixins.ListModelMixin,
     pagination_class = None
     permission_classes = [AllowAny]
 
+
 @action(
     detail=False,
     methods=['get'],
