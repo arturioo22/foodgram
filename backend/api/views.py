@@ -24,6 +24,7 @@ from .pagination import CustomPagination
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.views import APIView
+from django_filters.rest_framework import DjangoFilterBackend
 
 
 class CustomAuthToken(ObtainAuthToken):
@@ -402,6 +403,7 @@ class IngredientViewSet(mixins.ListModelMixin,
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
     filterset_class = IngredientFilter
+    filter_backends = [DjangoFilterBackend]
     pagination_class = None
     permission_classes = [AllowAny]
 
