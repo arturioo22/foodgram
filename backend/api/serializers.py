@@ -1,15 +1,16 @@
 import base64
 import uuid
-from django.core.files.base import ContentFile
-from rest_framework import serializers
+
 from django.contrib.auth import authenticate
+from django.core.files.base import ContentFile
 from django.utils.translation import gettext_lazy as _
 
-from users.models import User, Follow
+from rest_framework import serializers
+
 from recipes.models import (
-    Recipe, Ingredient, Tag, IngredientInRecipe,
-    Favorite, ShoppingCart
+    Favorite, Ingredient, IngredientInRecipe, Recipe, ShoppingCart, Tag
 )
+from users.models import Follow, User
 
 
 class Base64ImageField(serializers.ImageField):
@@ -372,10 +373,14 @@ class SubscriptionSerializer(CustomUserSerializer):
     recipes = serializers.SerializerMethodField()
     recipes_count = serializers.SerializerMethodField()
 
-    class Meta(CustomUserSerializer.Meta):
-        fields = CustomUserSerializer.Meta.fields + (
+    class Meta:
+        model = User
+        fields = (
+            'email', 'id', 'username', 'first_name', 'last_name',
+            'is_subscribed', 'password',
             'recipes', 'recipes_count'
         )
+        read_only_fields = ('id', 'is_subscribed')
 
     def get_recipes(self, obj):
         request = self.context.get('request')

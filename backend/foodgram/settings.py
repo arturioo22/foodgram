@@ -12,7 +12,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', get_random_secret_key())
 
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
-# ВАЖНО: Добавьте 'backend' для внутренних запросов от Nginx
+
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
 if 'fffoooddgramm.ddns.net' not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append('fffoooddgramm.ddns.net')
@@ -23,7 +23,7 @@ if 'localhost' not in ALLOWED_HOSTS:
 if '127.0.0.1' not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append('127.0.0.1')
 
-# ВАЖНО: Добавьте ваш домен в CSRF_TRUSTED_ORIGINS
+
 CSRF_TRUSTED_ORIGINS = os.getenv(
     'CSRF_TRUSTED_ORIGINS',
     'http://localhost,http://127.0.0.1'
@@ -43,7 +43,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework.authtoken',
-    'corsheaders',  # Должен быть перед другими apps
+    'corsheaders',
     'api.apps.ApiConfig',
     'recipes.apps.RecipesConfig',
 ]
@@ -51,7 +51,7 @@ INSTALLED_APPS = [
 AUTH_USER_MODEL = 'users.User'
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # Должен быть как можно выше
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -136,15 +136,15 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
-        'rest_framework.authentication.SessionAuthentication',  # Добавлено для CSRF
+        'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
     ],
 }
 
-# ВАЖНО: Настройки CORS
-CORS_ALLOW_ALL_ORIGINS = DEBUG  # Только для разработки
+
+CORS_ALLOW_ALL_ORIGINS = DEBUG
 CORS_ALLOWED_ORIGINS = [
     "http://fffoooddgramm.ddns.net",
     "http://localhost:3000",
@@ -181,12 +181,11 @@ CORS_EXPOSE_HEADERS = [
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_HTTPONLY = True
-CSRF_COOKIE_HTTPONLY = False  # Должно быть False для доступа через JS
+CSRF_COOKIE_HTTPONLY = False
 CSRF_USE_SESSIONS = False
-CSRF_COOKIE_SECURE = not DEBUG  # True в production
-SESSION_COOKIE_SECURE = not DEBUG  # True в production
+CSRF_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SECURE = not DEBUG
 
-# Если фронтенд на другом порту/домене
 CSRF_TRUSTED_ORIGINS = [
     'http://fffoooddgramm.ddns.net',
     'https://fffoooddgramm.ddns.net',

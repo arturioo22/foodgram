@@ -4,7 +4,7 @@ from django.utils import timezone
 
 class APILog(models.Model):
     """
-    Модель для логирования API запросов (опционально).
+    Модель для логирования API запросов.
     """
 
     user = models.ForeignKey(

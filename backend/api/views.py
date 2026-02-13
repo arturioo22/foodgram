@@ -1,30 +1,32 @@
-from rest_framework import viewsets, status, mixins
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.permissions import (
-    IsAuthenticated, AllowAny, IsAuthenticatedOrReadOnly
-)
-from django.shortcuts import get_object_or_404
 from django.db.models import Sum
 from django.http import HttpResponse
+from django.shortcuts import get_object_or_404
 
-from users.models import User, Follow
-from recipes.models import (
-    Recipe, Ingredient, Tag, IngredientInRecipe, Favorite, ShoppingCart
-)
-from .serializers import (
-    CustomUserSerializer, CustomUserCreateSerializer, SubscriptionSerializer,
-    RecipeReadSerializer, RecipeWriteSerializer,
-    IngredientSerializer, TagSerializer, ShortRecipeSerializer,
-    CustomTokenCreateSerializer
-)
-from .filters import RecipeFilter, IngredientFilter
-from .pagination import CustomPagination
+from django_filters.rest_framework import DjangoFilterBackend
 
+from rest_framework import mixins, status, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
+from rest_framework.decorators import action
+from rest_framework.permissions import (
+    AllowAny, IsAuthenticated, IsAuthenticatedOrReadOnly
+)
+from rest_framework.response import Response
 from rest_framework.views import APIView
-from django_filters.rest_framework import DjangoFilterBackend
+
+from recipes.models import (
+    Favorite, Ingredient, IngredientInRecipe, Recipe, ShoppingCart, Tag
+)
+from users.models import Follow, User
+
+from .filters import IngredientFilter, RecipeFilter
+from .pagination import CustomPagination
+from .serializers import (
+    CustomTokenCreateSerializer, CustomUserCreateSerializer,
+    CustomUserSerializer, IngredientSerializer, RecipeReadSerializer,
+    RecipeWriteSerializer, ShortRecipeSerializer, SubscriptionSerializer,
+    TagSerializer
+)
 
 
 class CustomAuthToken(ObtainAuthToken):
