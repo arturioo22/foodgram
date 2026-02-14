@@ -1,5 +1,5 @@
 from django.db.models import Sum
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 
 from django_filters.rest_framework import DjangoFilterBackend
@@ -111,41 +111,72 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(
         detail=False,
-        methods=['put', 'delete'],
+        methods=['get', 'put', 'delete'],
         permission_classes=[IsAuthenticated],
         url_path='me/avatar'
+    )
+    @action(
+        detail=False,
+        methods=['get', 'put', 'delete'],
+        permission_classes=[IsAuthenticated],
+        url_path='avatar'
     )
     def avatar(self, request):
         """Управление аватаром пользователя."""
         user = request.user
+        print(f"Avatar method: {request.method}")
+        print(f"Request data: {request.data}")
+        print(f"User: {user}")
 
         if request.method == 'GET':
-            return Response(
-                {'avatar': user.avatar.url if user.avatar else None},
-                status=status.HTTP_200_OK
-            )
+            if user.avatar:
+                return Response(
+                    {'avatar': request.build_absolute_uri(user.avatar.url)},
+                    status=status.HTTP_200_OK
+                )
+            return Response({'avatar': None}, status=status.HTTP_200_OK)
 
         elif request.method == 'PUT':
-            if 'avatar' not in request.FILES:
+            if 'avatar' not in request.data:
                 return Response(
-                    {'errors': 'Файл аватара не предоставлен'},
+                    {'avatar': ['Это поле обязательно.']},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            user.avatar = request.FILES['avatar']
-            user.save()
+            avatar_data = request.data.get('avatar')
+            print(f"Avatar data type: {type(avatar_data)}")
+            print(f"Avatar data preview: {str(avatar_data)[:50]}...")
 
-            return Response(
-                {'avatar': user.avatar.url},
-                status=status.HTTP_200_OK
+            serializer = CustomUserSerializer(
+                user,
+                data={'avatar': avatar_data},
+                partial=True,
+                context={'request': request}
             )
+
+            if serializer.is_valid():
+                serializer.save()
+                user.refresh_from_db()
+                if user.avatar:
+                    return Response(
+                        {'avatar': request.build_absolute_uri(
+                            user.avatar.url)},
+                        status=status.HTTP_200_OK
+                    )
+                return Response(
+                    {'avatar': None},
+                    status=status.HTTP_200_OK
+                )
+
+            print(f"Serializer errors: {serializer.errors}")
+            return Response(
+                serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         elif request.method == 'DELETE':
             if user.avatar:
                 user.avatar.delete(save=False)
             user.avatar = None
             user.save()
-
             return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
@@ -208,6 +239,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
     queryset = Recipe.objects.all()
     permission_classes = [IsAuthenticatedOrReadOnly]
+    filter_backends = [DjangoFilterBackend]
     filterset_class = RecipeFilter
     pagination_class = CustomPagination
 
@@ -222,20 +254,20 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         """Общий метод для PUT и PATCH."""
         partial = kwargs.pop('partial', False)
-        instance = self.get_object()
 
-        if partial:
-            if 'ingredients' not in request.data:
-                return Response(
-                    {'ingredients': ['Добавьте хотя бы один ингредиент.']},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+        try:
+            instance = self.get_object()
+        except Http404:
+            return Response(
+                {'detail': 'Страница не найдена.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
-            if 'tags' not in request.data:
-                return Response(
-                    {'tags': ['Добавьте хотя бы один тег.']},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+        if instance.author != request.user:
+            return Response(
+                {'detail': 'Недостаточно прав для данного действия.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
         serializer = self.get_serializer(
             instance,
@@ -243,35 +275,23 @@ class RecipeViewSet(viewsets.ModelViewSet):
             partial=partial
         )
         serializer.is_valid(raise_exception=True)
-
-        if instance.author != request.user:
-            message = (
-                'У вас недостаточно прав для выполнения данного действия.'
-            )
-            return Response(
-                {'detail': message},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
         self.perform_update(serializer)
 
         return Response(serializer.data)
 
-    def partial_update(self, request, *args, **kwargs):
-        """PATCH - частичное обновление."""
-        kwargs['partial'] = True
-        return self.update(request, *args, **kwargs)
-
     def destroy(self, request, *args, **kwargs):
         """DELETE - удаление."""
-        instance = self.get_object()
+        try:
+            instance = self.get_object()
+        except Http404:
+            return Response(
+                {'detail': 'Страница не найдена.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
         if instance.author != request.user:
-            message = (
-                "У вас недостаточно прав для выполнения данного действия."
-            )
             return Response(
-                {'detail': message},
+                {'detail': 'Недостаточно прав для данного действия'},
                 status=status.HTTP_403_FORBIDDEN
             )
 
@@ -387,14 +407,9 @@ class RecipeViewSet(viewsets.ModelViewSet):
     )
     def get_link(self, request, pk=None):
         """Получить короткую ссылку на рецепт."""
-        try:
-            link = request.build_absolute_uri(f'/api/recipes/{pk}/')
-            return Response({'short-link': link})
-        except Recipe.DoesNotExist:
-            return Response(
-                {'errors': 'Рецепт не найден'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+        self.get_object()
+        link = request.build_absolute_uri(f'/s/{pk}/')
+        return Response({'short-link': link})
 
     @action(
         detail=False,
@@ -420,6 +435,7 @@ class IngredientViewSet(mixins.ListModelMixin,
     filter_backends = [DjangoFilterBackend]
     pagination_class = None
     permission_classes = [AllowAny]
+    lookup_field = 'id'
 
 
 class TagViewSet(mixins.ListModelMixin,

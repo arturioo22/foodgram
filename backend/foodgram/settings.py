@@ -1,8 +1,9 @@
 import os
 from pathlib import Path
 
-from django.core.management.utils import get_random_secret_key
 from dotenv import load_dotenv
+
+from django.core.management.utils import get_random_secret_key
 
 load_dotenv()
 
@@ -177,7 +178,6 @@ CORS_EXPOSE_HEADERS = [
     'authorization',
 ]
 
-# Настройки сессии для CSRF
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_HTTPONLY = True

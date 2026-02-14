@@ -1,4 +1,5 @@
 from django.contrib.auth.models import AbstractUser, BaseUserManager
+from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models import Q
@@ -189,7 +190,7 @@ class Follow(models.Model):
 
     def clean(self):
         """Дополнительная валидация на уровне модели."""
-        from django.core.exceptions import ValidationError
+
         if self.user == self.author:
             raise ValidationError(_('Нельзя подписаться на самого себя.'))
 
