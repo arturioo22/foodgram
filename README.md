@@ -1,10 +1,8 @@
 Foodgram - Продуктовый помощник
-📖 Описание проекта
-
+Описание проекта
 Foodgram — это онлайн-сервис, где пользователи могут публиковать рецепты, подписываться на публикации других авторов, добавлять рецепты в избранное и формировать список покупок для выбранных блюд. Проект реализован с полной контейнеризацией и автоматическим CI/CD.
 
-Основные функции:
-
+Основные функции
 Публикация и редактирование рецептов
 
 Фильтрация рецептов по тегам (завтрак, обед, ужин и др.)
@@ -23,8 +21,7 @@ Docker-контейнеризация
 
 Автоматический CI/CD через GitHub Actions
 
-🛠️ Стек технологий
-
+Стек технологий
 Backend
 Django 4.2 - веб-фреймворк
 
@@ -56,7 +53,7 @@ GitHub Actions — CI/CD
 
 Docker Hub — реестр образов
 
-🚀 Развертывание проекта
+Развертывание проекта
 Предварительные требования
 Docker и Docker Compose
 
@@ -67,14 +64,11 @@ Node.js 18+ (для локальной разработки фронтенда)
 Git
 
 1. Клонирование репозитория
-bash
 git clone https://github.com/arturioo22/foodgram.git
 cd foodgram
-
 2. Настройка переменных окружения
 Создайте файл .env в корневой директории для разработки:
 
-env
 # Django
 SECRET_KEY=your-secret-key-here
 DEBUG=True
@@ -95,7 +89,6 @@ DJANGO_SUPERUSER_EMAIL=admin@example.com
 DJANGO_SUPERUSER_PASSWORD=admin123
 Для продакшена создайте файл .env.production:
 
-env
 # Django
 SECRET_KEY=your-production-secret-key
 DEBUG=False
@@ -109,9 +102,7 @@ DB_USER=foodgram_user
 DB_PASSWORD=your-db-password
 DB_HOST=db
 DB_PORT=5432
-
 3. Запуск в режиме разработки
-bash
 # Сборка и запуск контейнеров
 docker-compose up -d --build
 
@@ -128,7 +119,6 @@ API: http://localhost:8000/api/
 Админ-панель: http://localhost:8000/admin/
 
 4. Запуск в production
-bash
 # Запуск контейнеров
 docker-compose -f docker-compose.production.yml up -d
 
@@ -140,11 +130,10 @@ docker-compose -f docker-compose.production.yml exec backend python manage.py lo
 
 # Сбор статики
 docker-compose -f docker-compose.production.yml exec backend python manage.py collectstatic --noinput
-
-🔄 CI/CD и автоматический деплой
+CI/CD и автоматический деплой
 Проект использует GitHub Actions для автоматического тестирования, сборки образов и деплоя на сервер.
 
-Процесс деплоя:
+Процесс деплоя
 Пуш в ветку main запускает workflow
 
 Запускаются тесты (flake8, Django tests)
@@ -166,7 +155,7 @@ arturioo22/foodgram_gateway:latest
 Настройка секретов GitHub Actions
 Для работы CI/CD необходимо добавить следующие секреты в репозитории:
 
-Секрет	                 Описание
+Секрет	Описание
 DOCKERHUB_USERNAME	Имя пользователя Docker Hub
 DOCKERHUB_TOKEN	Токен доступа к Docker Hub
 HOST	IP-адрес сервера
@@ -175,8 +164,7 @@ SSH_KEY	Приватный SSH-ключ
 PASSPHRASE	Пароль от SSH-ключа (если есть)
 SECRET_KEY	Секретный ключ Django
 DB_PASSWORD	Пароль базы данных
-
-📋 API Документация
+API Документация
 После запуска проекта документация доступна по адресу:
 
 Локально: http://localhost/api/docs/
@@ -203,7 +191,7 @@ GET	/api/recipes/download_shopping_cart/	Скачать список покуп�
 GET	/api/tags/	Список тегов
 GET	/api/ingredients/	Список ингредиентов
 GET	/api/ingredients/?name={query}	Поиск ингредиентов
-🔍 Особенности реализации
+Особенности реализации
 База ингредиентов
 Проект включает 2186 предустановленных ингредиентов с единицами измерения
 
@@ -225,25 +213,24 @@ Email используется в качестве основного идент
 
 Нельзя подписаться на самого себя
 
-🧪 Тестирование
-bash
+Тестирование
 # Запуск тестов backend
 cd backend
 python manage.py test
 
 # Запуск линтера
 python -m flake8 .
-👤 Автор
+Автор
 Фисунов Артур
 
 Email: fisunov.arthur@yandex.ru
 
 GitHub: arturioo22
 
-🔗 Ссылки для проверки
+Ссылки для проверки
 Ресурс	URL
 Репозиторий	https://github.com/arturioo22/foodgram
-Workflow	https://github.com/arturioo22/foodgram/actions
+Workflow	[![Main Workflow](https://github.com/arturioo22/foodgram/actions/workflows/main.yml/badge.svg)](https://github.com/arturioo22/foodgram/actions/workflows/main.yml)
 Production	http://fffoooddgramm.ddns.net
 API	http://fffoooddgramm.ddns.net/api/
 Админ-панель	http://fffoooddgramm.ddns.net/admin/

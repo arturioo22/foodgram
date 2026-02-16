@@ -1,103 +1,63 @@
-from django.contrib.auth.models import AbstractUser, BaseUserManager
+from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
-
-class CustomUserManager(BaseUserManager):
-    """Кастомный менеджер поддержки аутентификации по email."""
-
-    use_in_migrations = True
-
-    def get_by_natural_key(self, username):
-        return self.get(
-            Q(username=username) | Q(email=username)
-        )
-
-    def _create_user(self, email, password, **extra_fields):
-        """Создает и сохраняет пользователя с email и паролем."""
-        if not email:
-            raise ValueError('Email должен быть указан')
-        email = self.normalize_email(email)
-        user = self.model(email=email, **extra_fields)
-        user.set_password(password)
-        user.save(using=self._db)
-        return user
-
-    def create_user(self, email, password=None, **extra_fields):
-        """Создает обычного пользователя."""
-        extra_fields.setdefault('is_staff', False)
-        extra_fields.setdefault('is_superuser', False)
-        return self._create_user(email, password, **extra_fields)
-
-    def create_superuser(self, email, password, **extra_fields):
-        """Создает суперпользователя."""
-        extra_fields.setdefault('is_staff', True)
-        extra_fields.setdefault('is_superuser', True)
-        extra_fields.setdefault('is_active', True)
-
-        if extra_fields.get('is_staff') is not True:
-            raise ValueError('Суперпользователь должен иметь is_staff=True.')
-        if extra_fields.get('is_superuser') is not True:
-            raise ValueError(
-                'Суперпользователь должен иметь is_superuser=True.')
-
-        return self._create_user(email, password, **extra_fields)
+from .constants import (
+    EMAIL_MAX_LENGTH, USERNAME_MAX_LENGTH, NAME_MAX_LENGTH,
+    USERNAME_REGEX, USERNAME_VALIDATION_MESSAGE,
+    USERNAME_UNIQUE_ERROR, SELF_FOLLOW_ERROR
+)
+from .managers import CustomUserManager
 
 
 class User(AbstractUser):
     """
     Кастомная модель пользователя.
+
     Расширяет стандартную модель Django AbstractUser.
+    Использует email в качестве основного идентификатора для аутентификации.
     """
 
     objects = CustomUserManager()
 
     username_validator = RegexValidator(
-        regex=r'^[\w.@+-]+\Z',
-        message=_(
-            'Имя пользователя может содержать '
-            'только буквы, цифры и @/./+/-/_')
+        regex=USERNAME_REGEX,
+        message=_(USERNAME_VALIDATION_MESSAGE)
     )
 
     email = models.EmailField(
         _('Адрес электронной почты'),
-        max_length=254,
+        max_length=EMAIL_MAX_LENGTH,
         unique=True,
-        blank=False,
-        null=False,
         help_text=_('Обязательное поле. Введите действующий email адрес.')
     )
 
     username = models.CharField(
         _('Имя пользователя'),
-        max_length=150,
+        max_length=USERNAME_MAX_LENGTH,
         unique=True,
         validators=[username_validator],
         help_text=_(
-            'Обязательное поле. Не более 150 символов. '
+            f'Обязательное поле. Не более {USERNAME_MAX_LENGTH} символов. '
             'Только буквы, цифры и @/./+/-/_.'
         ),
         error_messages={
-            'unique': _('Пользователь с таким именем уже существует.'),
+            'unique': _(USERNAME_UNIQUE_ERROR),
         },
     )
 
     first_name = models.CharField(
         _('Имя'),
-        max_length=150,
-        blank=False,
-        null=False,
+        max_length=NAME_MAX_LENGTH,
         help_text=_('Введите ваше имя (обязательно).')
     )
 
     last_name = models.CharField(
         _('Фамилия'),
-        max_length=150,
-        blank=False,
-        null=False,
+        max_length=NAME_MAX_LENGTH,
         help_text=_('Введите вашу фамилию (обязательно).')
     )
 
@@ -181,7 +141,7 @@ class Follow(models.Model):
             models.CheckConstraint(
                 check=~models.Q(user=models.F('author')),
                 name='prevent_self_follow',
-                violation_error_message=_('Нельзя подписаться на самого себя.')
+                violation_error_message=_(SELF_FOLLOW_ERROR)
             )
         ]
 
@@ -192,7 +152,7 @@ class Follow(models.Model):
         """Дополнительная валидация на уровне модели."""
 
         if self.user == self.author:
-            raise ValidationError(_('Нельзя подписаться на самого себя.'))
+            raise ValidationError(_(SELF_FOLLOW_ERROR))
 
         super().clean()
 

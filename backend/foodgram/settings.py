@@ -13,29 +13,14 @@ SECRET_KEY = os.getenv('SECRET_KEY', get_random_secret_key())
 
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
-
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
-if 'fffoooddgramm.ddns.net' not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append('fffoooddgramm.ddns.net')
-if 'backend' not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append('backend')
-if 'localhost' not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append('localhost')
-if '127.0.0.1' not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append('127.0.0.1')
-
 
 CSRF_TRUSTED_ORIGINS = os.getenv(
     'CSRF_TRUSTED_ORIGINS',
     'http://localhost,http://127.0.0.1'
 ).split(',')
-if 'http://fffoooddgramm.ddns.net' not in CSRF_TRUSTED_ORIGINS:
-    CSRF_TRUSTED_ORIGINS.append('http://fffoooddgramm.ddns.net')
-if 'https://fffoooddgramm.ddns.net' not in CSRF_TRUSTED_ORIGINS:
-    CSRF_TRUSTED_ORIGINS.append('https://fffoooddgramm.ddns.net')
 
 INSTALLED_APPS = [
-    'users.apps.UsersConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -45,8 +30,10 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
-    'api.apps.ApiConfig',
+    'djoser',
+    'users.apps.UsersConfig',
     'recipes.apps.RecipesConfig',
+    'api.apps.ApiConfig',
 ]
 
 AUTH_USER_MODEL = 'users.User'
@@ -120,7 +107,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'ru-ru'
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_L10N = True
@@ -144,15 +131,34 @@ REST_FRAMEWORK = {
     ],
 }
 
+DJOSER = {
+    'SERIALIZERS': {
+        'user': 'api.serializers.UserSerializer',
+        'current_user': 'api.serializers.UserSerializer',
+        'user_create': 'djoser.serializers.UserCreateSerializer',
+    },
+    'PERMISSIONS': {
+        'user': ['rest_framework.permissions.AllowAny'],
+        'user_list': ['rest_framework.permissions.AllowAny'],
+    },
+}
 
 CORS_ALLOW_ALL_ORIGINS = DEBUG
-CORS_ALLOWED_ORIGINS = [
-    "http://fffoooddgramm.ddns.net",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost",
-    "http://127.0.0.1",
-]
+
+CORS_ALLOWED_ORIGINS = []
+for host in ALLOWED_HOSTS:
+    if host and host not in ['*', 'backend']:
+        CORS_ALLOWED_ORIGINS.append(f'http://{host}')
+        CORS_ALLOWED_ORIGINS.append(f'https://{host}')
+
+if DEBUG:
+    CORS_ALLOWED_ORIGINS.extend([
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'http://localhost',
+        'http://127.0.0.1',
+    ])
+
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = [
     'DELETE',
@@ -185,12 +191,3 @@ CSRF_COOKIE_HTTPONLY = False
 CSRF_USE_SESSIONS = False
 CSRF_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_SECURE = not DEBUG
-
-CSRF_TRUSTED_ORIGINS = [
-    'http://fffoooddgramm.ddns.net',
-    'https://fffoooddgramm.ddns.net',
-    'http://localhost',
-    'http://127.0.0.1',
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-]
