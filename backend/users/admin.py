@@ -36,8 +36,7 @@ class UserAdmin(DjangoUserAdmin):
     )
 
     def get_form(self, request, obj=None, **kwargs):
-        """Переопределяем форму для корректного отображения
-        email как USERNAME_FIELD."""
+        """Переопределяем форму для корректного отображения."""
         form = super().get_form(request, obj, **kwargs)
         if 'username' in form.base_fields:
             form.base_fields['username'].required = True

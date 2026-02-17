@@ -8,7 +8,9 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import (
-    AllowAny, IsAuthenticated, IsAuthenticatedOrReadOnly
+    AllowAny,
+    IsAuthenticated,
+    IsAuthenticatedOrReadOnly,
 )
 from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
@@ -16,16 +18,25 @@ from rest_framework.viewsets import ReadOnlyModelViewSet
 from djoser.views import UserViewSet as DjoserUserViewSet
 
 from recipes.models import (
-    Favorite, Ingredient, IngredientInRecipe, Recipe, ShoppingCart, Tag
+    Favorite,
+    Ingredient,
+    IngredientInRecipe,
+    Recipe,
+    ShoppingCart,
+    Tag,
 )
 from users.models import Follow, User
 
 from .filters import IngredientFilter, RecipeFilter
 from .pagination import Pagination
 from .serializers import (
-    IngredientSerializer, RecipeReadSerializer,
-    RecipeWriteSerializer, ShortRecipeSerializer, SubscriptionSerializer,
-    TagSerializer, UserSerializer
+    IngredientSerializer,
+    RecipeReadSerializer,
+    RecipeWriteSerializer,
+    ShortRecipeSerializer,
+    SubscriptionSerializer,
+    TagSerializer,
+    UserSerializer,
 )
 
 
@@ -33,11 +44,7 @@ class UserViewSet(DjoserUserViewSet):
     """Вьюсет для пользователей."""
 
     pagination_class = Pagination
-
-    def get_serializer_class(self):
-        if self.action == 'set_password':
-            return super().get_serializer_class()
-        return UserSerializer
+    serializer_class = UserSerializer
 
     @action(
         detail=False,
@@ -56,36 +63,27 @@ class UserViewSet(DjoserUserViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            serializer = UserSerializer(
+            serializer = self.get_serializer(
                 user,
                 data={'avatar': request.data.get('avatar')},
-                partial=True,
-                context={'request': request}
+                partial=True
             )
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
 
-            if serializer.is_valid():
-                serializer.save()
-                user.refresh_from_db()
-                if user.avatar:
-                    return Response(
-                        {'avatar': request.build_absolute_uri(
-                            user.avatar.url)},
-                        status=status.HTTP_200_OK
-                    )
+            user.refresh_from_db()
+            if user.avatar:
                 return Response(
-                    {'avatar': None},
+                    {'avatar': request.build_absolute_uri(user.avatar.url)},
                     status=status.HTTP_200_OK
                 )
+            return Response({'avatar': None}, status=status.HTTP_200_OK)
 
-            return Response(
-                serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        elif request.method == 'DELETE':
-            if user.avatar:
-                user.avatar.delete(save=False)
-            user.avatar = None
-            user.save()
-            return Response(status=status.HTTP_204_NO_CONTENT)
+        if user.avatar:
+            user.avatar.delete(save=False)
+        user.avatar = None
+        user.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
         detail=False,
@@ -132,7 +130,6 @@ class UserViewSet(DjoserUserViewSet):
             )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        # DELETE
         deleted_count, _ = Follow.objects.filter(
             user=user, author=author
         ).delete()
@@ -192,7 +189,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     def destroy(self, request, *args, **kwargs):
-        """DELETE - удаление."""
+        """Удаление рецепта."""
         try:
             instance = self.get_object()
         except Http404:
@@ -240,22 +237,13 @@ class RecipeViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            try:
-                model.objects.create(user=user, recipe=recipe)
-                serializer = ShortRecipeSerializer(
-                    recipe,
-                    context={'request': request}
-                )
-                return Response(
-                    serializer.data, status=status.HTTP_201_CREATED
-                )
-            except Exception as e:
-                return Response(
-                    {'errors': str(e)},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            model.objects.create(user=user, recipe=recipe)
+            serializer = ShortRecipeSerializer(
+                recipe,
+                context={'request': request}
+            )
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        # DELETE
         deleted_count, _ = model.objects.filter(
             user=user, recipe=recipe
         ).delete()
@@ -268,15 +256,29 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    def _generate_shopping_list_text(self, ingredients):
-        """Генерация текста списка покупок."""
+    def _generate_shopping_list_response(self, ingredients):
+        """
+        Генерация файла со списком покупок.
+
+        Args:
+            ingredients: QuerySet с ингредиентами
+
+        Returns:
+            FileResponse: ответ с файлом для скачивания
+        """
         shopping_list = "Список покупок:\n\n"
         for ingredient in ingredients:
             name = ingredient['ingredient__name']
             unit = ingredient['ingredient__measurement_unit']
             amount = ingredient['total_amount']
             shopping_list += f"{name} ({unit}) - {amount}\n"
-        return shopping_list
+
+        return FileResponse(
+            shopping_list.encode('utf-8'),
+            content_type='text/plain; charset=utf-8',
+            as_attachment=True,
+            filename='shopping-list.txt'
+        )
 
     @action(
         detail=False,
@@ -302,15 +304,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        shopping_list_text = self._generate_shopping_list_text(ingredients)
-
-        response = FileResponse(
-            shopping_list_text.encode('utf-8'),
-            content_type='text/plain; charset=utf-8',
-            as_attachment=True,
-            filename='shopping-list.txt'
-        )
-        return response
+        return self._generate_shopping_list_response(ingredients)
 
     @action(
         detail=True,

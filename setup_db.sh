@@ -18,7 +18,6 @@ ING_COUNT=$(exec_db "SELECT COUNT(*) FROM recipes_ingredient;" | tr -d ' ' || ec
 if [ "$ING_COUNT" = "0" ] || [ "$ING_COUNT" -lt "1000" ]; then
     echo "Загрузка ингредиентов в базу данных..."
 
-    # Копирование файла с ингредиентами
     docker cp data/ingredients.json foodgram_backend_prod:/app/data/ingredients.json
 
     exec_backend python -c "

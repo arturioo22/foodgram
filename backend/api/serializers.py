@@ -1,4 +1,3 @@
-from django.contrib.auth import authenticate
 from django.utils.translation import gettext_lazy as _
 from djoser.serializers import UserSerializer as DjoserUserSerializer
 
@@ -13,42 +12,6 @@ from recipes.models import (
     Ingredient, IngredientInRecipe, Recipe, Tag
 )
 from users.models import Follow
-
-
-class TokenCreateSerializer(serializers.Serializer):
-    """Сериализатор для создания токена с email."""
-
-    email = serializers.EmailField(
-        label=_("Email"),
-        write_only=True
-    )
-    password = serializers.CharField(
-        label=_("Password"),
-        style={'input_type': 'password'},
-        trim_whitespace=False,
-        write_only=True
-    )
-
-    def validate(self, attrs):
-        email = attrs.get('email')
-        password = attrs.get('password')
-
-        if email and password:
-            user = authenticate(
-                request=self.context.get('request'),
-                username=email,
-                password=password
-            )
-
-            if not user:
-                msg = _('Неверный email или пароль.')
-                raise serializers.ValidationError(msg, code='authorization')
-        else:
-            msg = _('Должны быть указаны "email" и "password".')
-            raise serializers.ValidationError(msg, code='authorization')
-
-        attrs['user'] = user
-        return attrs
 
 
 class UserSerializer(DjoserUserSerializer):
@@ -142,7 +105,7 @@ class RecipeReadSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True, read_only=True)
     ingredients = IngredientInRecipeReadSerializer(
         many=True,
-        source='ingredient_list',
+        source='ingredient_recipes',
         read_only=True
     )
     is_favorited = serializers.SerializerMethodField()
@@ -202,30 +165,37 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ('author',)
 
-    def validate_ingredients(self, value):
-        if not value:
-            raise serializers.ValidationError(
-                ERROR_MESSAGES['at_least_one_ingredient']
-            )
+    def validate(self, data):
+        """
+        Общая валидация данных рецепта.
 
-        ingredient_ids = [item['ingredient'].id for item in value]
+        Проверяет наличие ингредиентов и тегов, отсутствие дубликатов.
+        """
+        ingredients = data.get('ingredients')
+        tags = data.get('tags')
+
+        if not ingredients:
+            raise serializers.ValidationError({
+                'ingredients': ERROR_MESSAGES['at_least_one_ingredient']
+            })
+
+        if not tags:
+            raise serializers.ValidationError({
+                'tags': ERROR_MESSAGES['at_least_one_tag']
+            })
+
+        ingredient_ids = [item['ingredient'].id for item in ingredients]
         if len(ingredient_ids) != len(set(ingredient_ids)):
-            raise serializers.ValidationError(
-                ERROR_MESSAGES['duplicate_ingredients']
-            )
-        return value
+            raise serializers.ValidationError({
+                'ingredients': ERROR_MESSAGES['duplicate_ingredients']
+            })
 
-    def validate_tags(self, value):
-        if not value:
-            raise serializers.ValidationError(
-                ERROR_MESSAGES['at_least_one_tag']
-            )
+        if len(tags) != len(set(tags)):
+            raise serializers.ValidationError({
+                'tags': ERROR_MESSAGES['duplicate_tags']
+            })
 
-        if len(value) != len(set(value)):
-            raise serializers.ValidationError(
-                ERROR_MESSAGES['duplicate_tags']
-            )
-        return value
+        return data
 
     def validate_image(self, value):
         if not value and self.instance is None:
@@ -267,7 +237,7 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
             recipe.tags.set(tags_data)
 
         if ingredients_data is not None:
-            recipe.ingredient_list.all().delete()
+            recipe.ingredient_recipes.all().delete()
             self._create_ingredients(recipe, ingredients_data)
 
         return recipe

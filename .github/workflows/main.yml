@@ -172,7 +172,6 @@ jobs:
             echo "Загрузка фикстур..."
             docker cp data/. foodgram_backend_prod:/app/data/
 
-            # Делаем скрипт исполняемым и запускаем
             chmod +x setup_db.sh
             ./setup_db.sh
 

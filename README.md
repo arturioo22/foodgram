@@ -125,8 +125,8 @@ docker-compose -f docker-compose.production.yml up -d
 # Применение миграций
 docker-compose -f docker-compose.production.yml exec backend python manage.py migrate --noinput
 
-# Загрузка ингредиентов (при первом запуске)
-docker-compose -f docker-compose.production.yml exec backend python manage.py loaddata /app/data/ingredients_fixture.json
+# Первоначальная настройка базы данных (ингредиенты, теги, суперпользователь)
+./scripts/init_db.sh
 
 # Сбор статики
 docker-compose -f docker-compose.production.yml exec backend python manage.py collectstatic --noinput

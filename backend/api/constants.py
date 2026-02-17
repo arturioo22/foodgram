@@ -8,6 +8,10 @@ MAX_COOKING_TIME = 32000
 MAX_NAME_LENGTH = 200
 MAX_TEXT_LENGTH = 2000
 
+# Константы для логирования
+API_LOG_ENDPOINT_MAX_LENGTH = 500
+API_LOG_METHOD_MAX_LENGTH = 10
+
 # Сообщения об ошибках
 ERROR_MESSAGES = {
     'required': 'Это поле обязательно.',

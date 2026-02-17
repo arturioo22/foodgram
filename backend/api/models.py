@@ -1,11 +1,12 @@
 from django.db import models
 from django.utils import timezone
 
+from api.constants import (API_LOG_ENDPOINT_MAX_LENGTH,
+                           API_LOG_METHOD_MAX_LENGTH)
+
 
 class APILog(models.Model):
-    """
-    Модель для логирования API запросов.
-    """
+    """Модель для логирования API запросов."""
 
     user = models.ForeignKey(
         'users.User',
@@ -17,13 +18,13 @@ class APILog(models.Model):
 
     endpoint = models.CharField(
         'Эндпоинт',
-        max_length=500,
+        max_length=API_LOG_ENDPOINT_MAX_LENGTH,
         help_text='URL эндпоинта API'
     )
 
     method = models.CharField(
         'HTTP метод',
-        max_length=10,
+        max_length=API_LOG_METHOD_MAX_LENGTH,
         help_text='HTTP метод запроса'
     )
 
@@ -86,9 +87,7 @@ class APILog(models.Model):
 
     @classmethod
     def create_log(cls, **kwargs):
-        """
-        Создает запись лога API.
-        """
+        """Создает запись лога API."""
         try:
             return cls.objects.create(**kwargs)
         except Exception:
