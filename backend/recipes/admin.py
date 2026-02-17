@@ -52,7 +52,7 @@ class RecipeAdmin(admin.ModelAdmin):
     )
     list_filter = ('tags', 'author', 'pub_date')
     search_fields = ('name', 'author__username', 'author__email')
-    readonly_fields = ('pub_date', 'updated')
+    readonly_fields = ('pub_date')
     inlines = [IngredientInRecipeInline]
     filter_horizontal = ('tags',)
 
