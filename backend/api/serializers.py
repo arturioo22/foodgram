@@ -1,4 +1,3 @@
-from django.utils.translation import gettext_lazy as _
 from djoser.serializers import UserSerializer as DjoserUserSerializer
 
 from rest_framework import serializers
