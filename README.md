@@ -110,7 +110,7 @@ docker-compose up -d --build
 docker-compose exec backend python manage.py migrate
 
 # Загрузка фикстур с ингредиентами
-docker-compose exec backend python manage.py loaddata /app/data/ingredients_fixture.json
+docker-compose exec backend python manage.py loaddata /app/data/ingredients.json
 
 # Сбор статики
 docker-compose exec backend python manage.py collectstatic --noinput

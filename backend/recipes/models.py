@@ -1,7 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
-from users.models import User
 
 from recipes.constants import (
     AMOUNT_VALIDATION_ERROR,
@@ -17,6 +16,7 @@ from recipes.constants import (
     TAG_NAME_MAX_LENGTH,
     TAG_SLUG_MAX_LENGTH,
 )
+from users.models import User
 
 
 class Ingredient(models.Model):

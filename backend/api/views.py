@@ -4,7 +4,7 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse
 
 from django_filters.rest_framework import DjangoFilterBackend
-
+from djoser.views import UserViewSet as DjoserUserViewSet
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import (
@@ -15,8 +15,17 @@ from rest_framework.permissions import (
 from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
-from djoser.views import UserViewSet as DjoserUserViewSet
-
+from api.filters import IngredientFilter, RecipeFilter
+from api.pagination import Pagination
+from api.serializers import (
+    IngredientSerializer,
+    RecipeReadSerializer,
+    RecipeWriteSerializer,
+    ShortRecipeSerializer,
+    SubscriptionSerializer,
+    TagSerializer,
+    UserSerializer,
+)
 from recipes.models import (
     Favorite,
     Ingredient,
@@ -26,18 +35,6 @@ from recipes.models import (
     Tag,
 )
 from users.models import Follow, User
-
-from .filters import IngredientFilter, RecipeFilter
-from .pagination import Pagination
-from .serializers import (
-    IngredientSerializer,
-    RecipeReadSerializer,
-    RecipeWriteSerializer,
-    ShortRecipeSerializer,
-    SubscriptionSerializer,
-    TagSerializer,
-    UserSerializer,
-)
 
 
 class UserViewSet(DjoserUserViewSet):
@@ -256,30 +253,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    def _generate_shopping_list_response(self, ingredients):
-        """
-        Генерация файла со списком покупок.
-
-        Args:
-            ingredients: QuerySet с ингредиентами
-
-        Returns:
-            FileResponse: ответ с файлом для скачивания
-        """
-        shopping_list = "Список покупок:\n\n"
-        for ingredient in ingredients:
-            name = ingredient['ingredient__name']
-            unit = ingredient['ingredient__measurement_unit']
-            amount = ingredient['total_amount']
-            shopping_list += f"{name} ({unit}) - {amount}\n"
-
-        return FileResponse(
-            shopping_list.encode('utf-8'),
-            content_type='text/plain; charset=utf-8',
-            as_attachment=True,
-            filename='shopping-list.txt'
-        )
-
     @action(
         detail=False,
         methods=['get'],
@@ -304,7 +277,19 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        return self._generate_shopping_list_response(ingredients)
+        shopping_list = "Список покупок:\n\n"
+        for ingredient in ingredients:
+            name = ingredient['ingredient__name']
+            unit = ingredient['ingredient__measurement_unit']
+            amount = ingredient['total_amount']
+            shopping_list += f"{name} ({unit}) - {amount}\n"
+
+        return FileResponse(
+            shopping_list.encode('utf-8'),
+            content_type='text/plain; charset=utf-8',
+            as_attachment=True,
+            filename='shopping-list.txt'
+        )
 
     @action(
         detail=True,

@@ -223,23 +223,20 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
         recipe = Recipe.objects.create(**validated_data)
         recipe.tags.set(tags_data)
         self._create_ingredients(recipe, ingredients_data)
-
         return recipe
 
     def update(self, instance, validated_data):
         ingredients_data = validated_data.pop('ingredients', None)
         tags_data = validated_data.pop('tags', None)
 
-        recipe = super().update(instance, validated_data)
-
         if tags_data is not None:
-            recipe.tags.set(tags_data)
+            instance.tags.set(tags_data)
 
         if ingredients_data is not None:
-            recipe.ingredient_recipes.all().delete()
-            self._create_ingredients(recipe, ingredients_data)
+            instance.ingredient_recipes.all().delete()
+            self._create_ingredients(instance, ingredients_data)
 
-        return recipe
+        return super().update(instance, validated_data)
 
     def to_representation(self, instance):
         """Возвращает данные в формате RecipeReadSerializer."""
