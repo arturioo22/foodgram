@@ -164,12 +164,18 @@ SSH_KEY	Приватный SSH-ключ
 PASSPHRASE	Пароль от SSH-ключа (если есть)
 SECRET_KEY	Секретный ключ Django
 DB_PASSWORD	Пароль базы данных
-API Документация
-После запуска проекта документация доступна по адресу:
 
-Локально: http://localhost/api/docs/
+## API
 
-Production: http://fffoooddgramm.ddns.net/api/docs/
+API доступно по адресу: `https://fffoooddgramm.ddns.net/api/`
+
+Основные эндпоинты:
+- `api/users/` — пользователи
+- `api/recipes/` — рецепты
+- `api/ingredients/` — ингредиенты
+- `api/tags/` — теги
+
+При переходе по ссылкам в браузере открывается интерактивный интерфейс Django REST Framework.
 
 Основные эндпоинты
 Метод	URL	Описание
