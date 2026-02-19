@@ -102,34 +102,7 @@ DB_USER=foodgram_user
 DB_PASSWORD=your-db-password
 DB_HOST=db
 DB_PORT=5432
-3. Запуск в режиме разработки
-# Сборка и запуск контейнеров
-docker-compose up -d --build
 
-# Применение миграций
-docker-compose exec backend python manage.py migrate
-
-# Загрузка фикстур с ингредиентами
-docker-compose exec backend python manage.py loaddata /app/data/ingredients.json
-
-# Сбор статики
-docker-compose exec backend python manage.py collectstatic --noinput
-Сайт будет доступен по адресу: http://localhost:8000
-API: http://localhost:8000/api/
-Админ-панель: http://localhost:8000/admin/
-
-4. Запуск в production
-# Запуск контейнеров
-docker-compose -f docker-compose.production.yml up -d
-
-# Применение миграций
-docker-compose -f docker-compose.production.yml exec backend python manage.py migrate --noinput
-
-# Первоначальная настройка базы данных (ингредиенты, теги, суперпользователь)
-./scripts/init_db.sh
-
-# Сбор статики
-docker-compose -f docker-compose.production.yml exec backend python manage.py collectstatic --noinput
 CI/CD и автоматический деплой
 Проект использует GitHub Actions для автоматического тестирования, сборки образов и деплоя на сервер.
 
