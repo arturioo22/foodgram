@@ -141,7 +141,7 @@ DB_PASSWORD	Пароль базы данных
 
 ## API
 
-API доступно по адресу: `https://fffoooddgramm.ddns.net/api/`
+API доступно по адресу: https://fffoooddgramm.ddns.net/api/docs/
 
 Основные эндпоинты:
 - `api/users/` — пользователи
