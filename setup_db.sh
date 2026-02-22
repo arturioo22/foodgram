@@ -1,3 +1,4 @@
+#!/bin/bash
 # Скрипт для первоначальной настройки базы данных.
 # Загружаем ингредиенты, создаем теги, суперпользователя и тестовые рецепты.
 
@@ -13,7 +14,20 @@ exec_db() {
 
 echo "Настройка базы данных..."
 
-# Загрузка ингредиентов
+echo "Применение миграций..."
+exec_backend python manage.py migrate
+
+echo "Проверка структуры таблицы recipes_recipe..."
+COLUMN_EXISTS=$(exec_db "SELECT column_name FROM information_schema.columns WHERE table_name='recipes_recipe' AND column_name='updated';" | tr -d ' ')
+
+if [ -z "$COLUMN_EXISTS" ]; then
+    echo "Поле updated отсутствует. Создаем поле updated в таблице recipes_recipe..."
+    exec_db "ALTER TABLE recipes_recipe ADD COLUMN updated timestamp with time zone DEFAULT NOW();"
+    echo "Поле updated успешно создано"
+else
+    echo "Поле updated уже существует"
+fi
+
 ING_COUNT=$(exec_db "SELECT COUNT(*) FROM recipes_ingredient;" | tr -d ' ' || echo "0")
 
 if [ "$ING_COUNT" = "0" ] || [ "$ING_COUNT" -lt "1000" ]; then
@@ -23,6 +37,11 @@ if [ "$ING_COUNT" = "0" ] || [ "$ING_COUNT" -lt "1000" ]; then
 
     exec_backend python -c "
 import json
+import os
+from pathlib import Path
+
+# Создаем директорию если её нет
+Path('/app/data').mkdir(parents=True, exist_ok=True)
 
 with open('/app/data/ingredients.json', 'r', encoding='utf-8') as f:
     ingredients = json.load(f)
@@ -51,7 +70,7 @@ else
     echo "Ингредиенты уже загружены ($ING_COUNT шт.)"
 fi
 
-# Создание тегов (исправлено: убран color)
+# Создание тегов
 TAG_COUNT=$(exec_db "SELECT COUNT(*) FROM recipes_tag;" | tr -d ' ' || echo "0")
 
 if [ "$TAG_COUNT" = "0" ]; then
@@ -65,10 +84,6 @@ tags = [
     {'name': 'Обед', 'slug': 'lunch'},
     {'name': 'Ужин', 'slug': 'dinner'},
     {'name': 'Десерт', 'slug': 'dessert'},
-    {'name': 'Выпечка', 'slug': 'baking'},
-    {'name': 'Салат', 'slug': 'salad'},
-    {'name': 'Супы', 'slug': 'soup'},
-    {'name': 'Напитки', 'slug': 'drinks'},
 ]
 
 for tag in tags:
@@ -165,6 +180,7 @@ from django.core.files.base import ContentFile
 from django.contrib.auth import get_user_model
 from recipes.models import Recipe, Ingredient, Tag, IngredientInRecipe
 from django.utils import timezone
+from django.db import connection
 
 User = get_user_model()
 
@@ -199,7 +215,7 @@ if len(ingredients) < 3:
 recipes_for_user1 = [
     {
         'name': 'Борщ',
-        'text': 'обычный борщ',
+        'text': 'Классический борщ с мясом и свеклой',
         'cooking_time': 90,
         'tags': [t for t in tags if t.slug in ['soup', 'dinner']],
         'ingredients': [
@@ -211,8 +227,8 @@ recipes_for_user1 = [
         ]
     },
     {
-        'name': 'Салат',
-        'text': 'салат с курицей',
+        'name': 'Салат Цезарь',
+        'text': 'Классический салат с курицей и соусом',
         'cooking_time': 30,
         'tags': [t for t in tags if t.slug in ['salad', 'lunch']],
         'ingredients': [
@@ -223,8 +239,8 @@ recipes_for_user1 = [
         ]
     },
     {
-        'name': 'Омлет',
-        'text': 'Хороший завтрак',
+        'name': 'Омлет с сыром',
+        'text': 'Пышный омлет с сыром на завтрак',
         'cooking_time': 15,
         'tags': [t for t in tags if t.slug in ['breakfast']],
         'ingredients': [
@@ -235,8 +251,8 @@ recipes_for_user1 = [
         ]
     },
     {
-        'name': 'Шарлотка',
-        'text': 'яблочный пирог',
+        'name': 'Шарлотка с яблоками',
+        'text': 'Простой и вкусный яблочный пирог',
         'cooking_time': 60,
         'tags': [t for t in tags if t.slug in ['dessert', 'baking']],
         'ingredients': [
@@ -248,11 +264,11 @@ recipes_for_user1 = [
     },
 ]
 
-# Создаем рецепты для второго пользователя (3 рецепта)
+# Создаем рецепты для второго пользователя
 recipes_for_user2 = [
     {
-        'name': 'Гречка',
-        'text': 'обычная гречка',
+        'name': 'Гречка с грибами',
+        'text': 'Гречневая каша с жареными грибами',
         'cooking_time': 50,
         'tags': [t for t in tags if t.slug in ['dinner']],
         'ingredients': [
@@ -263,8 +279,8 @@ recipes_for_user2 = [
         ]
     },
     {
-        'name': 'Блины',
-        'text': 'обычные блины',
+        'name': 'Блины тонкие',
+        'text': 'Тонкие блины на молоке',
         'cooking_time': 25,
         'tags': [t for t in tags if t.slug in ['breakfast', 'dessert']],
         'ingredients': [
@@ -276,8 +292,8 @@ recipes_for_user2 = [
         ]
     },
     {
-        'name': 'Куриный суп',
-        'text': 'обычный куриный суп',
+        'name': 'Куриный суп с лапшой',
+        'text': 'Легкий куриный суп с домашней лапшой',
         'cooking_time': 60,
         'tags': [t for t in tags if t.slug in ['soup', 'lunch']],
         'ingredients': [
@@ -290,19 +306,24 @@ recipes_for_user2 = [
     },
 ]
 
-# ИСПРАВЛЕННАЯ функция для создания рецепта
+# Функция для создания рецепта
 def create_recipe(author, recipe_data):
-    # Создаем объект рецепта без сохранения
+    # Проверяем, существует ли уже такой рецепт
+    if Recipe.objects.filter(name=recipe_data['name'], author=author).exists():
+        print(f'  - Рецепт "{recipe_data["name"]}" уже существует')
+        return None
+    
+    # Создаем объект рецепта
     recipe = Recipe(
         author=author,
         name=recipe_data['name'],
         text=recipe_data['text'],
         cooking_time=recipe_data['cooking_time'],
         image=get_test_image(),
-        pub_date=timezone.now()  # Явно указываем дату публикации
+        pub_date=timezone.now()
     )
     
-    # Сохраняем рецепт (updated установится автоматически через auto_now)
+    # Сохраняем рецепт
     recipe.save()
     
     # Добавляем теги
@@ -310,7 +331,6 @@ def create_recipe(author, recipe_data):
         recipe.tags.add(tag)
     
     # Добавляем ингредиенты
-    from recipes.models import IngredientInRecipe
     for ing_data in recipe_data['ingredients']:
         IngredientInRecipe.objects.create(
             recipe=recipe,
@@ -322,21 +342,14 @@ def create_recipe(author, recipe_data):
     return recipe
 
 # Создаем рецепты для первого пользователя
-print('Создание рецептов для author1:')
+print('\nСоздание рецептов для author1:')
 for recipe_data in recipes_for_user1:
-    # Проверяем, существует ли уже такой рецепт
-    if not Recipe.objects.filter(name=recipe_data['name'], author=author1).exists():
-        create_recipe(author1, recipe_data)
-    else:
-        print(f'  - Рецепт "{recipe_data["name"]}" уже существует')
+    create_recipe(author1, recipe_data)
 
 # Создаем рецепты для второго пользователя
 print('\nСоздание рецептов для author2:')
 for recipe_data in recipes_for_user2:
-    if not Recipe.objects.filter(name=recipe_data['name'], author=author2).exists():
-        create_recipe(author2, recipe_data)
-    else:
-        print(f'  - Рецепт "{recipe_data["name"]}" уже существует')
+    create_recipe(author2, recipe_data)
 
 # Проверка итогов
 print(f'\nВсего рецептов в базе: {Recipe.objects.count()}')
