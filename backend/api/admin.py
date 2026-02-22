@@ -11,7 +11,6 @@ class APILogAdmin(admin.ModelAdmin):
     list_filter = ('method', 'status_code', 'created')
     search_fields = ('endpoint', 'user__username', 'user__email')
     readonly_fields = ('created',)
-    date_hierarchy = 'created'
 
     fieldsets = (
         ('Основная информация', {

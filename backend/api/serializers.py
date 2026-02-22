@@ -1,16 +1,27 @@
-from djoser.serializers import UserSerializer as DjoserUserSerializer
+from django.utils.translation import gettext_lazy as _
 
+from djoser.serializers import (
+    UserCreateSerializer as DjoserUserCreateSerializer
+)
+from djoser.serializers import UserSerializer as DjoserUserSerializer
+from drf_extra_fields.fields import Base64ImageField
 from rest_framework import serializers
 
-from api.constants import (
-    ERROR_MESSAGES, MAX_NAME_LENGTH, MIN_COOKING_TIME,
-    MAX_COOKING_TIME, MIN_AMOUNT, MAX_AMOUNT, MAX_TEXT_LENGTH
-)
-from api.fields import Base64ImageField
-from recipes.models import (
-    Ingredient, IngredientInRecipe, Recipe, Tag
-)
-from users.models import Follow
+from api.constants import (ERROR_MESSAGES, MAX_AMOUNT, MAX_COOKING_TIME,
+                           MAX_NAME_LENGTH, MAX_TEXT_LENGTH, MIN_AMOUNT,
+                           MIN_COOKING_TIME)
+from recipes.models import (Ingredient, IngredientInRecipe, Recipe, Tag)
+from users.models import Follow, User
+
+
+class UserCreateSerializer(DjoserUserCreateSerializer):
+    """Сериализатор для создания пользователя."""
+
+    class Meta(DjoserUserCreateSerializer.Meta):
+        model = User
+        fields = (
+            'email', 'id', 'username', 'first_name', 'last_name', 'password'
+        )
 
 
 class UserSerializer(DjoserUserSerializer):
@@ -83,6 +94,7 @@ class IngredientInRecipeReadSerializer(serializers.ModelSerializer):
     measurement_unit = serializers.ReadOnlyField(
         source='ingredient.measurement_unit'
     )
+    amount = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = IngredientInRecipe
@@ -104,11 +116,12 @@ class RecipeReadSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True, read_only=True)
     ingredients = IngredientInRecipeReadSerializer(
         many=True,
-        source='ingredient_recipes',
+        source='ingredient_list',
         read_only=True
     )
     is_favorited = serializers.SerializerMethodField()
     is_in_shopping_cart = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = Recipe
@@ -127,27 +140,44 @@ class RecipeReadSerializer(serializers.ModelSerializer):
             and getattr(obj, manager_name).filter(user=request.user).exists()
         )
 
+    def get_image(self, obj):
+        """Получение полного URL изображения."""
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
+
     def get_is_favorited(self, obj):
-        return self._get_user_related_exists(obj, 'favorited_by')
+        return self._get_user_related_exists(obj, 'favorites')
 
     def get_is_in_shopping_cart(self, obj):
-        return self._get_user_related_exists(obj, 'in_shopping_cart')
+        return self._get_user_related_exists(obj, 'shopping_cart')
 
 
 class RecipeWriteSerializer(serializers.ModelSerializer):
     """Сериализатор для создания и обновления рецептов."""
 
-    ingredients = IngredientInRecipeWriteSerializer(many=True)
+    ingredients = IngredientInRecipeWriteSerializer(many=True, required=True)
     tags = serializers.PrimaryKeyRelatedField(
         queryset=Tag.objects.all(),
-        many=True
+        many=True,
+        required=True
     )
-    image = Base64ImageField()
-    name = serializers.CharField(max_length=MAX_NAME_LENGTH)
-    text = serializers.CharField(max_length=MAX_TEXT_LENGTH)
+    image = Base64ImageField(required=True)
+    name = serializers.CharField(
+        max_length=MAX_NAME_LENGTH,
+        required=True
+    )
+    text = serializers.CharField(
+        max_length=MAX_TEXT_LENGTH,
+        required=True
+    )
     cooking_time = serializers.IntegerField(
         min_value=MIN_COOKING_TIME,
         max_value=MAX_COOKING_TIME,
+        required=True,
         error_messages={
             'min_value': ERROR_MESSAGES['min_time'],
             'max_value': ERROR_MESSAGES['max_time'],
@@ -197,7 +227,7 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
         return data
 
     def validate_image(self, value):
-        if not value and self.instance is None:
+        if not value:
             raise serializers.ValidationError(ERROR_MESSAGES['required'])
         return value
 
@@ -233,7 +263,7 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
             instance.tags.set(tags_data)
 
         if ingredients_data is not None:
-            instance.ingredient_recipes.all().delete()
+            instance.ingredient_list.all().delete()
             self._create_ingredients(instance, ingredients_data)
 
         return super().update(instance, validated_data)

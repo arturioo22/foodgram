@@ -1,6 +1,6 @@
 from rest_framework.pagination import PageNumberPagination
 
-from .constants import PAGE_SIZE
+from api.constants import PAGE_SIZE
 
 
 class Pagination(PageNumberPagination):
