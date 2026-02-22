@@ -48,7 +48,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('amount', models.PositiveSmallIntegerField(help_text='Введите количество ингредиента', validators=[django.core.validators.MinValueValidator(1, message='Количество должно быть не менее 1.'), django.core.validators.MaxValueValidator(10000, message='Количество не может превышать 10000.')], verbose_name='Количество')),
-                ('ingredient', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='ingredient_list', to='recipes.ingredient', verbose_name='Ингредиент')),
+                ('ingredient', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='ingredient_in_recipe', to='recipes.ingredient', verbose_name='Ингредиент')),
             ],
             options={
                 'verbose_name': 'Ингредиент в рецепте',
@@ -79,7 +79,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='ingredientinrecipe',
             name='recipe',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='ingredient_list', to='recipes.recipe', verbose_name='Рецепт'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='ingredient_in_recipe', to='recipes.recipe', verbose_name='Рецепт'),
         ),
         migrations.CreateModel(
             name='Favorite',

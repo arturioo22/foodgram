@@ -5,18 +5,16 @@ from django.db import models
 from users.models import User
 
 from .constants import (
-    INGREDIENT_NAME_MAX_LENGTH,
-    MEASUREMENT_UNIT_MAX_LENGTH,
-    TAG_NAME_MAX_LENGTH,
-    TAG_COLOR_MAX_LENGTH,
-    TAG_SLUG_MAX_LENGTH,
-    RECIPE_NAME_MAX_LENGTH,
-    MIN_AMOUNT,
-    MAX_AMOUNT,
-    MIN_COOKING_TIME,
-    MAX_COOKING_TIME,
     AMOUNT_VALIDATION_ERROR,
-    COOKING_TIME_VALIDATION_ERROR,
+    INGREDIENT_NAME_MAX_LENGTH,
+    MAX_AMOUNT,
+    MAX_COOKING_TIME,
+    MEASUREMENT_UNIT_MAX_LENGTH,
+    MIN_AMOUNT,
+    MIN_COOKING_TIME,
+    RECIPE_NAME_MAX_LENGTH,
+    TAG_NAME_MAX_LENGTH,
+    TAG_SLUG_MAX_LENGTH,
 )
 
 
@@ -75,13 +73,6 @@ class Tag(models.Model):
         help_text='Введите уникальное название тега'
     )
 
-    color = models.CharField(
-        'Цвет в HEX',
-        max_length=TAG_COLOR_MAX_LENGTH,
-        unique=True,
-        help_text='Введите цвет в HEX формате (например: #FF0000)'
-    )
-
     slug = models.SlugField(
         'Уникальный слаг',
         max_length=TAG_SLUG_MAX_LENGTH,
@@ -97,15 +88,6 @@ class Tag(models.Model):
 
     def __str__(self):
         return self.name
-
-    def clean(self):
-        """Валидация цвета в HEX формате."""
-        if self.color and not self.color.startswith('#'):
-            raise ValidationError(
-                'Цвет должен быть в HEX формате (начинаться с #).'
-            )
-
-        super().clean()
 
 
 class Recipe(models.Model):
@@ -198,22 +180,6 @@ class Recipe(models.Model):
     def __str__(self):
         return self.name
 
-    def clean(self):
-        """Валидация на уровне модели."""
-        if not self.name:
-            raise ValidationError('Название рецепта обязательно.')
-        if not self.text:
-            raise ValidationError('Описание рецепта обязательно.')
-
-        if self.cooking_time:
-            if (self.cooking_time < MIN_COOKING_TIME
-                    or self.cooking_time > MAX_COOKING_TIME):
-                raise ValidationError({
-                    'cooking_time': COOKING_TIME_VALIDATION_ERROR
-                })
-
-        super().clean()
-
     @property
     def favorite_count(self):
         """Количество добавлений в избранное."""
@@ -234,14 +200,14 @@ class IngredientInRecipe(models.Model):
     recipe = models.ForeignKey(
         Recipe,
         on_delete=models.CASCADE,
-        related_name='ingredient_list',
+        related_name='ingredient_in_recipe',
         verbose_name='Рецепт'
     )
 
     ingredient = models.ForeignKey(
         Ingredient,
         on_delete=models.CASCADE,
-        related_name='ingredient_list',
+        related_name='ingredient_in_recipe',
         verbose_name='Ингредиент'
     )
 
@@ -290,22 +256,19 @@ class IngredientInRecipe(models.Model):
         super().clean()
 
 
-class Favorite(models.Model):
+class BaseUserRecipeRelation(models.Model):
     """
-    Модель для избранных рецептов пользователя.
+    Абстрактная базовая модель для связей пользователя с рецептами.
     """
-
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        related_name='favorites',
         verbose_name='Пользователь'
     )
 
     recipe = models.ForeignKey(
         Recipe,
         on_delete=models.CASCADE,
-        related_name='favorites',
         verbose_name='Рецепт'
     )
 
@@ -315,9 +278,31 @@ class Favorite(models.Model):
     )
 
     class Meta:
+        abstract = True
+        ordering = ['-created']
+
+
+class Favorite(BaseUserRecipeRelation):
+    """
+    Модель для избранных рецептов пользователя.
+    """
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        verbose_name='Пользователь',
+        related_name='favorites'
+    )
+
+    recipe = models.ForeignKey(
+        Recipe,
+        on_delete=models.CASCADE,
+        verbose_name='Рецепт',
+        related_name='favorites'
+    )
+
+    class Meta(BaseUserRecipeRelation.Meta):
         verbose_name = 'Избранное'
         verbose_name_plural = 'Избранное'
-        ordering = ['-created']
         constraints = [
             models.UniqueConstraint(
                 fields=['user', 'recipe'],
@@ -325,63 +310,31 @@ class Favorite(models.Model):
             )
         ]
 
-    def __str__(self):
-        return f'{self.user} - {self.recipe}'
 
-    def clean(self):
-        """
-        Проверяем, что пользователь не добавляет свой же рецепт в избранное.
-        """
-        if self.recipe.author == self.user:
-            raise ValidationError('Нельзя добавить свой рецепт в избранное.')
-
-        super().clean()
-
-    def save(self, *args, **kwargs):
-        """Переопределяем save для вызова full_clean."""
-        self.full_clean()
-        super().save(*args, **kwargs)
-
-
-class ShoppingCart(models.Model):
+class ShoppingCart(BaseUserRecipeRelation):
     """
     Модель для списка покупок пользователя.
     """
-
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        related_name='shopping_cart',
-        verbose_name='Пользователь'
+        verbose_name='Пользователь',
+        related_name='shopping_carts'
     )
 
     recipe = models.ForeignKey(
         Recipe,
         on_delete=models.CASCADE,
-        related_name='shopping_cart',
-        verbose_name='Рецепт'
+        verbose_name='Рецепт',
+        related_name='shopping_carts'
     )
 
-    created = models.DateTimeField(
-        'Дата добавления',
-        auto_now_add=True
-    )
-
-    class Meta:
+    class Meta(BaseUserRecipeRelation.Meta):
         verbose_name = 'Список покупок'
         verbose_name_plural = 'Списки покупок'
-        ordering = ['-created']
         constraints = [
             models.UniqueConstraint(
                 fields=['user', 'recipe'],
                 name='unique_recipe_in_shopping_cart'
             )
         ]
-
-    def __str__(self):
-        return f'{self.user} - {self.recipe}'
-
-    def save(self, *args, **kwargs):
-        """Переопределяем save для вызова full_clean."""
-        self.full_clean()
-        super().save(*args, **kwargs)

@@ -23,8 +23,7 @@ class RecipeFilter(filters.FilterSet):
         Возвращает рецепты, добавленные в избранное текущим пользователем.
         """
         if value and self.request.user.is_authenticated:
-            if value is True or str(value).lower() == 'true' or value == '1':
-                return queryset.filter(favorites__user=self.request.user)
+            return queryset.filter(favorites__user=self.request.user)
         return queryset
 
     def filter_is_in_shopping_cart(self, queryset, name, value):
@@ -34,8 +33,7 @@ class RecipeFilter(filters.FilterSet):
         Возвращает рецепты, добавленные в корзину текущим пользователем.
         """
         if value and self.request.user.is_authenticated:
-            if value is True or str(value).lower() == 'true' or value == '1':
-                return queryset.filter(shopping_cart__user=self.request.user)
+            return queryset.filter(shopping_carts__user=self.request.user)
         return queryset
 
 

@@ -32,7 +32,7 @@ class IngredientAdmin(admin.ModelAdmin):
 class TagAdmin(admin.ModelAdmin):
     """Админка для тегов."""
 
-    list_display = ('name', 'color', 'slug')
+    list_display = ('name', 'slug')
     search_fields = ('name', 'slug')
     prepopulated_fields = {'slug': ('name',)}
 
@@ -72,7 +72,7 @@ class RecipeAdmin(admin.ModelAdmin):
 
         Возвращает строку с названиями ингредиентов, разделёнными запятыми.
         """
-        ingredients = obj.ingredient_list.select_related('ingredient')
+        ingredients = obj.ingredient_in_recipe.select_related('ingredient')
         return ", ".join([
             f"{item.ingredient.name} "
             f"({item.amount} {item.ingredient.measurement_unit})"
