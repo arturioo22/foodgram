@@ -61,14 +61,14 @@ if [ "$TAG_COUNT" = "0" ]; then
 from recipes.models import Tag
 
 tags = [
-    {'name': 'Завтрак', 'color': '#E26C2D', 'slug': 'breakfast'},
-    {'name': 'Обед', 'color': '#49B64E', 'slug': 'lunch'},
-    {'name': 'Ужин', 'color': '#8775D2', 'slug': 'dinner'},
-    {'name': 'Десерт', 'color': '#FFD700', 'slug': 'dessert'},
-    {'name': 'Выпечка', 'color': '#FF6347', 'slug': 'baking'},
-    {'name': 'Салат', 'color': '#32CD32', 'slug': 'salad'},
-    {'name': 'Супы', 'color': '#1E90FF', 'slug': 'soup'},
-    {'name': 'Напитки', 'color': '#9370DB', 'slug': 'drinks'},
+    {'name': 'Завтрак', 'slug': 'breakfast'},
+    {'name': 'Обед', 'slug': 'lunch'},
+    {'name': 'Ужин', 'slug': 'dinner'},
+    {'name': 'Десерт', 'slug': 'dessert'},
+    {'name': 'Выпечка', 'slug': 'baking'},
+    {'name': 'Салат', 'slug': 'salad'},
+    {'name': 'Супы', 'slug': 'soup'},
+    {'name': 'Напитки', 'slug': 'drinks'},
 ]
 
 for tag in tags:
