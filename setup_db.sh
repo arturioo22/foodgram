@@ -289,15 +289,16 @@ recipes_for_user2 = [
     },
 ]
 
-# Функция для создания рецепта (исправлено: добавлено изображение)
 def create_recipe(author, recipe_data):
-    recipe = Recipe.objects.create(
+    # Создаем рецепт без указания updated (оно auto_now)
+    recipe = Recipe(
         author=author,
         name=recipe_data['name'],
         text=recipe_data['text'],
         cooking_time=recipe_data['cooking_time'],
-        image=get_test_image()  # Добавлено изображение
+        image=get_test_image()
     )
+    recipe.save()  # save вызовет установку auto_now
     
     # Добавляем теги
     for tag in recipe_data['tags']:
