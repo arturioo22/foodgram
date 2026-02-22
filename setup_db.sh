@@ -156,7 +156,7 @@ EOF
 
 echo "Создание тестовых рецептов..."
 
-# Добавляем тестовое изображение (1x1 прозрачный PNG в base64)
+# Тестовое изображение (1x1 прозрачный PNG в base64)
 TEST_IMAGE="iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
 
 exec_backend python manage.py shell << EOF
@@ -164,6 +164,7 @@ import base64
 from django.core.files.base import ContentFile
 from django.contrib.auth import get_user_model
 from recipes.models import Recipe, Ingredient, Tag, IngredientInRecipe
+from django.utils import timezone
 
 User = get_user_model()
 
@@ -289,16 +290,20 @@ recipes_for_user2 = [
     },
 ]
 
+# ИСПРАВЛЕННАЯ функция для создания рецепта
 def create_recipe(author, recipe_data):
-    # Создаем рецепт без указания updated (оно auto_now)
+    # Создаем объект рецепта без сохранения
     recipe = Recipe(
         author=author,
         name=recipe_data['name'],
         text=recipe_data['text'],
         cooking_time=recipe_data['cooking_time'],
-        image=get_test_image()
+        image=get_test_image(),
+        pub_date=timezone.now()  # Явно указываем дату публикации
     )
-    recipe.save()  # save вызовет установку auto_now
+    
+    # Сохраняем рецепт (updated установится автоматически через auto_now)
+    recipe.save()
     
     # Добавляем теги
     for tag in recipe_data['tags']:
