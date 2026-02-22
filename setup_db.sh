@@ -1,12 +1,178 @@
-echo "Создание тестовых рецептов..."
+# Скрипт для первоначальной настройки базы данных.
+# Загружаем ингредиенты, создаем теги, суперпользователя и тестовые рецепты.
+
+set -e
+
+exec_backend() {
+    docker-compose -f docker-compose.production.yml exec -T backend "$@"
+}
+
+exec_db() {
+    docker-compose -f docker-compose.production.yml exec -T db psql -U foodgram_user -d foodgram -t -c "$1"
+}
+
+echo "Настройка базы данных..."
+
+# Загрузка ингредиентов
+ING_COUNT=$(exec_db "SELECT COUNT(*) FROM recipes_ingredient;" | tr -d ' ' || echo "0")
+
+if [ "$ING_COUNT" = "0" ] || [ "$ING_COUNT" -lt "1000" ]; then
+    echo "Загрузка ингредиентов в базу данных..."
+
+    docker cp data/ingredients.json foodgram_backend_prod:/app/data/ingredients.json
+
+    exec_backend python -c "
+import json
+
+with open('/app/data/ingredients.json', 'r', encoding='utf-8') as f:
+    ingredients = json.load(f)
+
+fixture = []
+for ing in ingredients:
+    fixture.append({
+        'model': 'recipes.ingredient',
+        'fields': {
+            'name': ing['name'],
+            'measurement_unit': ing['measurement_unit']
+        }
+    })
+
+with open('/app/data/ingredients_fixture.json', 'w', encoding='utf-8') as f:
+    json.dump(fixture, f, ensure_ascii=False, indent=2)
+
+print(f'Конвертировано {len(fixture)} ингредиентов')
+"
+
+    exec_backend python manage.py loaddata /app/data/ingredients_fixture.json
+
+    NEW_COUNT=$(exec_db "SELECT COUNT(*) FROM recipes_ingredient;" | tr -d ' ')
+    echo "Загружено $NEW_COUNT ингредиентов"
+else
+    echo "Ингредиенты уже загружены ($ING_COUNT шт.)"
+fi
+
+# Создание тегов (исправлено: убран color)
+TAG_COUNT=$(exec_db "SELECT COUNT(*) FROM recipes_tag;" | tr -d ' ' || echo "0")
+
+if [ "$TAG_COUNT" = "0" ]; then
+    echo "Создание тегов..."
+
+    exec_backend python manage.py shell << EOF
+from recipes.models import Tag
+
+tags = [
+    {'name': 'Завтрак', 'slug': 'breakfast'},
+    {'name': 'Обед', 'slug': 'lunch'},
+    {'name': 'Ужин', 'slug': 'dinner'},
+    {'name': 'Десерт', 'slug': 'dessert'},
+    {'name': 'Выпечка', 'slug': 'baking'},
+    {'name': 'Салат', 'slug': 'salad'},
+    {'name': 'Супы', 'slug': 'soup'},
+    {'name': 'Напитки', 'slug': 'drinks'},
+]
+
+for tag in tags:
+    Tag.objects.get_or_create(**tag)
+
+print(f'Создано {Tag.objects.count()} тегов')
+EOF
+
+    NEW_COUNT=$(exec_db "SELECT COUNT(*) FROM recipes_tag;" | tr -d ' ')
+    echo "Создано $NEW_COUNT тегов"
+else
+    echo "Теги уже загружены ($TAG_COUNT шт.)"
+fi
+
+# Создание суперпользователя
+SUPERUSER_EXISTS=$(exec_db "SELECT COUNT(*) FROM users_user WHERE is_superuser = true;" | tr -d ' ' || echo "0")
+
+if [ "$SUPERUSER_EXISTS" = "0" ]; then
+    echo "Создание суперпользователя..."
+
+    exec_backend python manage.py shell << EOF
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+if not User.objects.filter(is_superuser=True).exists():
+    User.objects.create_superuser(
+        email='admin@example.com',
+        username='admin',
+        password='admin123',
+        first_name='Admin',
+        last_name='User'
+    )
+    print('Суперпользователь создан')
+else:
+    print('Суперпользователь уже существует')
+EOF
+
+    echo "Суперпользователь создан"
+else
+    echo "Суперпользователь уже существует"
+fi
+
+echo "Создание тестовых пользователей..."
 
 exec_backend python manage.py shell << EOF
 from django.contrib.auth import get_user_model
-from recipes.models import Recipe, Ingredient, Tag, IngredientInRecipe
-from django.utils import timezone
-import random
 
 User = get_user_model()
+
+# Создаем первого пользователя
+user1, created = User.objects.get_or_create(
+    email='author1@example.com',
+    defaults={
+        'username': 'author1',
+        'first_name': 'Иван',
+        'last_name': 'Петров',
+        'is_active': True
+    }
+)
+if created:
+    user1.set_password('password123')
+    user1.save()
+    print('Пользователь author1 создан')
+else:
+    print('Пользователь author1 уже существует')
+
+# Создаем второго пользователя
+user2, created = User.objects.get_or_create(
+    email='author2@example.com',
+    defaults={
+        'username': 'author2',
+        'first_name': 'Мария',
+        'last_name': 'Иванова',
+        'is_active': True
+    }
+)
+if created:
+    user2.set_password('password123')
+    user2.save()
+    print('Пользователь author2 создан')
+else:
+    print('Пользователь author2 уже существует')
+EOF
+
+echo "Создание тестовых рецептов..."
+
+# Добавляем тестовое изображение (1x1 прозрачный PNG в base64)
+TEST_IMAGE="iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+
+exec_backend python manage.py shell << EOF
+import base64
+from django.core.files.base import ContentFile
+from django.contrib.auth import get_user_model
+from recipes.models import Recipe, Ingredient, Tag, IngredientInRecipe
+
+User = get_user_model()
+
+# Функция для создания тестового изображения
+def get_test_image():
+    return ContentFile(
+        base64.b64decode('$TEST_IMAGE'),
+        name='test.png'
+    )
 
 # Получаем пользователей
 try:
@@ -123,16 +289,14 @@ recipes_for_user2 = [
     },
 ]
 
-# Функция для создания рецепта
+# Функция для создания рецепта (исправлено: добавлено изображение)
 def create_recipe(author, recipe_data):
-    # Явно указываем все поля, включая pub_date и updated
     recipe = Recipe.objects.create(
         author=author,
         name=recipe_data['name'],
         text=recipe_data['text'],
         cooking_time=recipe_data['cooking_time'],
-        pub_date=timezone.now(),  # Явно задаем дату публикации
-        # updated заполнится автоматически благодаря auto_now=True
+        image=get_test_image()  # Добавлено изображение
     )
     
     # Добавляем теги
@@ -140,6 +304,7 @@ def create_recipe(author, recipe_data):
         recipe.tags.add(tag)
     
     # Добавляем ингредиенты
+    from recipes.models import IngredientInRecipe
     for ing_data in recipe_data['ingredients']:
         IngredientInRecipe.objects.create(
             recipe=recipe,
@@ -172,3 +337,10 @@ print(f'\nВсего рецептов в базе: {Recipe.objects.count()}')
 print(f'Рецептов у author1: {author1.recipes.count()}')
 print(f'Рецептов у author2: {author2.recipes.count()}')
 EOF
+
+echo "Настройка базы данных завершена успешно!"
+echo "Итоги:"
+echo "- Ингредиентов: $(exec_db "SELECT COUNT(*) FROM recipes_ingredient;" | tr -d ' ')"
+echo "- Тегов: $(exec_db "SELECT COUNT(*) FROM recipes_tag;" | tr -d ' ')"
+echo "- Пользователей: $(exec_db "SELECT COUNT(*) FROM users_user;" | tr -d ' ')"
+echo "- Рецептов: $(exec_db "SELECT COUNT(*) FROM recipes_recipe;" | tr -d ' ')"
