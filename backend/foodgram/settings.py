@@ -133,13 +133,27 @@ REST_FRAMEWORK = {
 
 DJOSER = {
     'SERIALIZERS': {
+        'user_create': 'djoser.serializers.UserCreateSerializer',
         'user': 'api.serializers.UserSerializer',
         'current_user': 'api.serializers.UserSerializer',
+        'set_password': 'djoser.serializers.SetPasswordSerializer',
+        'token': 'djoser.serializers.TokenSerializer',
+        'token_create': 'djoser.serializers.TokenCreateSerializer',
     },
     'PERMISSIONS': {
-        'user': ['rest_framework.permissions.AllowAny'],
+        'user_create': ['rest_framework.permissions.AllowAny'],
         'user_list': ['rest_framework.permissions.AllowAny'],
+        'user': ['rest_framework.permissions.AllowAny'],
+        'user_delete': ['rest_framework.permissions.IsAuthenticated'],
+        'set_password': ['rest_framework.permissions.IsAuthenticated'],
+        'reset_password': ['rest_framework.permissions.AllowAny'],
+        'reset_password_confirm': ['rest_framework.permissions.AllowAny'],
+        'activation': ['rest_framework.permissions.AllowAny'],
+        'subscriptions': ['rest_framework.permissions.IsAuthenticated'],
+        'subscribe': ['rest_framework.permissions.IsAuthenticated'],
     },
+
+    'HIDE_USERS': False,
 }
 
 CORS_ALLOW_ALL_ORIGINS = DEBUG

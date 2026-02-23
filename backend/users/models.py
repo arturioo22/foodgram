@@ -137,11 +137,6 @@ class Follow(models.Model):
                 fields=['user', 'author'],
                 name='unique_follow'
             ),
-            models.CheckConstraint(
-                check=~models.Q(user=models.F('author')),
-                name='prevent_self_follow',
-                violation_error_message=_(SELF_FOLLOW_ERROR)
-            )
         ]
 
     def __str__(self):

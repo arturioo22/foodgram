@@ -29,9 +29,8 @@ class UserSerializer(DjoserUserSerializer):
 
     def get_is_subscribed(self, obj):
         request = self.context.get('request')
-        if request and request.user.is_authenticated:
-            return request.user.following.filter(author=obj).exists()
-        return False
+        return (request and request.user.is_authenticated
+                and request.user.follower.filter(author=obj).exists())
 
     def get_avatar(self, obj):
         """Получить URL аватара пользователя."""
@@ -143,23 +142,22 @@ class RecipeReadSerializer(serializers.ModelSerializer):
             'name', 'image', 'text', 'cooking_time'
         )
 
-    def get_is_favorited(self, obj):
-        """Проверяет, находится ли рецепт в избранном у пользователя."""
+    def _check_relation(self, obj, relation_manager):
+        """Общий метод для проверки наличия объекта в списке пользователя."""
         request = self.context.get('request')
         return (
             request
             and request.user.is_authenticated
-            and obj.favorites.filter(user=request.user).exists()
+            and relation_manager.filter(user=request.user).exists()
         )
+
+    def get_is_favorited(self, obj):
+        """Проверяет, находится ли рецепт в избранном у пользователя."""
+        return self._check_relation(obj, obj.favorites)
 
     def get_is_in_shopping_cart(self, obj):
         """Проверяет, находится ли рецепт в корзине у пользователя."""
-        request = self.context.get('request')
-        return (
-            request
-            and request.user.is_authenticated
-            and obj.shopping_carts.filter(user=request.user).exists()
-        )
+        return self._check_relation(obj, obj.shopping_carts)
 
 
 class RecipeWriteSerializer(serializers.ModelSerializer):

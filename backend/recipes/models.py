@@ -3,7 +3,6 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 from users.models import User
-
 from .constants import (
     AMOUNT_VALIDATION_ERROR,
     INGREDIENT_NAME_MAX_LENGTH,
@@ -257,9 +256,7 @@ class IngredientInRecipe(models.Model):
 
 
 class BaseUserRecipeRelation(models.Model):
-    """
-    Абстрактная базовая модель для связей пользователя с рецептами.
-    """
+    """Абстрактная базовая модель для связей пользователя с рецептами."""
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -281,28 +278,16 @@ class BaseUserRecipeRelation(models.Model):
         abstract = True
         ordering = ['-created']
 
+        default_related_name = '%(class)ss'
+
 
 class Favorite(BaseUserRecipeRelation):
-    """
-    Модель для избранных рецептов пользователя.
-    """
-    user = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        verbose_name='Пользователь',
-        related_name='favorites'
-    )
-
-    recipe = models.ForeignKey(
-        Recipe,
-        on_delete=models.CASCADE,
-        verbose_name='Рецепт',
-        related_name='favorites'
-    )
+    """Модель для избранных рецептов пользователя."""
 
     class Meta(BaseUserRecipeRelation.Meta):
         verbose_name = 'Избранное'
         verbose_name_plural = 'Избранное'
+        default_related_name = 'favorites'
         constraints = [
             models.UniqueConstraint(
                 fields=['user', 'recipe'],
@@ -312,26 +297,12 @@ class Favorite(BaseUserRecipeRelation):
 
 
 class ShoppingCart(BaseUserRecipeRelation):
-    """
-    Модель для списка покупок пользователя.
-    """
-    user = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        verbose_name='Пользователь',
-        related_name='shopping_carts'
-    )
-
-    recipe = models.ForeignKey(
-        Recipe,
-        on_delete=models.CASCADE,
-        verbose_name='Рецепт',
-        related_name='shopping_carts'
-    )
+    """Модель для списка покупок пользователя."""
 
     class Meta(BaseUserRecipeRelation.Meta):
         verbose_name = 'Список покупок'
         verbose_name_plural = 'Списки покупок'
+        default_related_name = 'shopping_carts'
         constraints = [
             models.UniqueConstraint(
                 fields=['user', 'recipe'],
