@@ -217,7 +217,7 @@ recipes_for_user1 = [
         'name': 'Борщ',
         'text': 'Классический борщ с мясом и свеклой',
         'cooking_time': 90,
-        'tags': [t for t in tags if t.slug in ['soup', 'dinner']],
+        'tags': [t for t in tags if t.slug in ['dinner']],
         'ingredients': [
             {'ingredient': ingredients[0], 'amount': 500},
             {'ingredient': ingredients[1], 'amount': 300},
@@ -230,7 +230,7 @@ recipes_for_user1 = [
         'name': 'Салат Цезарь',
         'text': 'Классический салат с курицей и соусом',
         'cooking_time': 30,
-        'tags': [t for t in tags if t.slug in ['salad', 'lunch']],
+        'tags': [t for t in tags if t.slug in ['lunch']],
         'ingredients': [
             {'ingredient': ingredients[5], 'amount': 300},
             {'ingredient': ingredients[6], 'amount': 200},
@@ -254,7 +254,7 @@ recipes_for_user1 = [
         'name': 'Шарлотка с яблоками',
         'text': 'Простой и вкусный яблочный пирог',
         'cooking_time': 60,
-        'tags': [t for t in tags if t.slug in ['dessert', 'baking']],
+        'tags': [t for t in tags if t.slug in ['dessert']],
         'ingredients': [
             {'ingredient': ingredients[13], 'amount': 200},
             {'ingredient': ingredients[14], 'amount': 200},
@@ -282,7 +282,7 @@ recipes_for_user2 = [
         'name': 'Блины тонкие',
         'text': 'Тонкие блины на молоке',
         'cooking_time': 25,
-        'tags': [t for t in tags if t.slug in ['breakfast', 'dessert']],
+        'tags': [t for t in tags if t.slug in ['breakfast']],
         'ingredients': [
             {'ingredient': ingredients[4], 'amount': 200},
             {'ingredient': ingredients[5], 'amount': 50},
@@ -295,7 +295,7 @@ recipes_for_user2 = [
         'name': 'Куриный суп с лапшой',
         'text': 'Легкий куриный суп с домашней лапшой',
         'cooking_time': 60,
-        'tags': [t for t in tags if t.slug in ['soup', 'lunch']],
+        'tags': [t for t in tags if t.slug in ['lunch']],
         'ingredients': [
             {'ingredient': ingredients[9], 'amount': 400},
             {'ingredient': ingredients[10], 'amount': 200},
