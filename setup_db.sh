@@ -1,5 +1,6 @@
-# Скрипт для полной перезагрузки базы данных.
-# Очищает все данные и загружает заново. Без подтверждения!
+#!/bin/bash
+# Скрипт для первоначальной настройки базы данных.
+# Загружаем ингредиенты, создаем теги, суперпользователя и тестовые рецепты.
 
 set -e
 
@@ -11,174 +12,166 @@ exec_db() {
     docker-compose -f docker-compose.production.yml exec -T db psql -U foodgram_user -d foodgram -t -c "$1"
 }
 
-echo "🔄 ПОЛНАЯ ПЕРЕЗАГРУЗКА БАЗЫ ДАННЫХ"
-echo "====================================="
+echo "Настройка базы данных..."
 
-echo "1. Очистка существующих данных..."
+echo "Применение миграций..."
+exec_backend python manage.py migrate
 
-# Отключаем проверку внешних ключей временно
-exec_db "SET session_replication_role = 'replica';" 2>/dev/null || true
+echo "Проверка структуры таблицы recipes_recipe..."
+COLUMN_EXISTS=$(exec_db "SELECT column_name FROM information_schema.columns WHERE table_name='recipes_recipe' AND column_name='updated';" | tr -d ' ')
 
-# Очищаем таблицы в правильном порядке (сначала зависимые)
-echo "   - Удаление рецептов..."
-exec_db "TRUNCATE TABLE recipes_recipe CASCADE;" 2>/dev/null || echo "      (таблица recipes_recipe не существует)"
+if [ -z "$COLUMN_EXISTS" ]; then
+    echo "Поле updated отсутствует. Создаем поле updated в таблице recipes_recipe..."
+    exec_db "ALTER TABLE recipes_recipe ADD COLUMN updated timestamp with time zone DEFAULT NOW();"
+    echo "Поле updated успешно создано"
+else
+    echo "Поле updated уже существует"
+fi
 
-echo "   - Удаление ингредиентов в рецептах..."
-exec_db "TRUNCATE TABLE recipes_ingredientinrecipe CASCADE;" 2>/dev/null || echo "      (таблица ingredientinrecipe не существует)"
+ING_COUNT=$(exec_db "SELECT COUNT(*) FROM recipes_ingredient;" | tr -d ' ' || echo "0")
 
-echo "   - Удаление избранного..."
-exec_db "TRUNCATE TABLE recipes_favorite CASCADE;" 2>/dev/null || echo "      (таблица favorite не существует)"
+if [ "$ING_COUNT" = "0" ] || [ "$ING_COUNT" -lt "1000" ]; then
+    echo "Загрузка ингредиентов в базу данных..."
 
-echo "   - Удаление корзины..."
-exec_db "TRUNCATE TABLE recipes_shoppingcart CASCADE;" 2>/dev/null || echo "      (таблица shoppingcart не существует)"
+    docker cp data/ingredients.json foodgram_backend_prod:/app/data/ingredients.json
 
-echo "   - Удаление тегов..."
-exec_db "TRUNCATE TABLE recipes_tag CASCADE;" 2>/dev/null || echo "      (таблица tag не существует)"
-
-echo "   - Удаление ингредиентов..."
-exec_db "TRUNCATE TABLE recipes_ingredient CASCADE;" 2>/dev/null || echo "      (таблица ingredient не существует)"
-
-echo "   - Удаление пользователей (кроме суперпользователей)..."
-exec_db "DELETE FROM users_user WHERE is_superuser = false;" 2>/dev/null || echo "      (таблица users_user не существует)"
-
-# Включаем обратно проверку внешних ключей
-exec_db "SET session_replication_role = 'origin';" 2>/dev/null || true
-
-echo "✅ Очистка завершена"
-echo ""
-
-echo "2. Применение миграций..."
-exec_backend python manage.py migrate --noinput
-echo "✅ Миграции применены"
-echo ""
-
-echo "3. Загрузка ингредиентов..."
-
-# Копируем файл с ингредиентами
-docker cp data/ingredients.json foodgram_backend_prod:/app/data/ingredients.json 2>/dev/null || {
-    echo "   ⚠️  Файл ingredients.json не найден, пропускаем..."
-}
-
-# Конвертируем и загружаем
-exec_backend python -c "
+    exec_backend python -c "
 import json
 import os
+from pathlib import Path
 
-json_file = '/app/data/ingredients.json'
-if os.path.exists(json_file):
-    with open(json_file, 'r', encoding='utf-8') as f:
-        ingredients = json.load(f)
-    
-    fixture = []
-    for ing in ingredients:
-        fixture.append({
-            'model': 'recipes.ingredient',
-            'fields': {
-                'name': ing['name'],
-                'measurement_unit': ing['measurement_unit']
-            }
-        })
-    
-    with open('/app/data/ingredients_fixture.json', 'w', encoding='utf-8') as f:
-        json.dump(fixture, f, ensure_ascii=False, indent=2)
-    
-    from django.core.management import call_command
-    call_command('loaddata', '/app/data/ingredients_fixture.json')
-    print(f'✅ Загружено {len(fixture)} ингредиентов')
-else:
-    print('⚠️  Файл ingredients.json не найден, ингредиенты не загружены')
+# Создаем директорию если её нет
+Path('/app/data').mkdir(parents=True, exist_ok=True)
+
+with open('/app/data/ingredients.json', 'r', encoding='utf-8') as f:
+    ingredients = json.load(f)
+
+fixture = []
+for ing in ingredients:
+    fixture.append({
+        'model': 'recipes.ingredient',
+        'fields': {
+            'name': ing['name'],
+            'measurement_unit': ing['measurement_unit']
+        }
+    })
+
+with open('/app/data/ingredients_fixture.json', 'w', encoding='utf-8') as f:
+    json.dump(fixture, f, ensure_ascii=False, indent=2)
+
+print(f'Конвертировано {len(fixture)} ингредиентов')
 "
 
-ING_COUNT=$(exec_db "SELECT COUNT(*) FROM recipes_ingredient;" | tr -d ' ')
-echo "   Ингредиентов в базе: $ING_COUNT"
-echo ""
+    exec_backend python manage.py loaddata /app/data/ingredients_fixture.json
 
-echo "4. Создание тегов..."
+    NEW_COUNT=$(exec_db "SELECT COUNT(*) FROM recipes_ingredient;" | tr -d ' ')
+    echo "Загружено $NEW_COUNT ингредиентов"
+else
+    echo "Ингредиенты уже загружены ($ING_COUNT шт.)"
+fi
 
-exec_backend python manage.py shell << EOF
+# Создание тегов
+TAG_COUNT=$(exec_db "SELECT COUNT(*) FROM recipes_tag;" | tr -d ' ' || echo "0")
+
+if [ "$TAG_COUNT" = "0" ]; then
+    echo "Создание тегов..."
+
+    exec_backend python manage.py shell << EOF
 from recipes.models import Tag
 
 tags = [
-    {'name': 'Завтрак', 'color': '#E26C2D', 'slug': 'breakfast'},
-    {'name': 'Обед', 'color': '#49B64E', 'slug': 'lunch'},
-    {'name': 'Ужин', 'color': '#8775D2', 'slug': 'dinner'},
-    {'name': 'Десерт', 'color': '#FFD700', 'slug': 'dessert'},
-    {'name': 'Выпечка', 'color': '#FF6347', 'slug': 'baking'},
-    {'name': 'Салат', 'color': '#32CD32', 'slug': 'salad'},
-    {'name': 'Супы', 'color': '#1E90FF', 'slug': 'soup'},
-    {'name': 'Напитки', 'color': '#9370DB', 'slug': 'drinks'},
+    {'name': 'Завтрак', 'slug': 'breakfast'},
+    {'name': 'Обед', 'slug': 'lunch'},
+    {'name': 'Ужин', 'slug': 'dinner'},
+    {'name': 'Десерт', 'slug': 'dessert'},
 ]
 
 for tag in tags:
     Tag.objects.get_or_create(**tag)
 
-print(f'✅ Создано {Tag.objects.count()} тегов')
+print(f'Создано {Tag.objects.count()} тегов')
 EOF
 
-TAG_COUNT=$(exec_db "SELECT COUNT(*) FROM recipes_tag;" | tr -d ' ')
-echo "   Тегов в базе: $TAG_COUNT"
-echo ""
+    NEW_COUNT=$(exec_db "SELECT COUNT(*) FROM recipes_tag;" | tr -d ' ')
+    echo "Создано $NEW_COUNT тегов"
+else
+    echo "Теги уже загружены ($TAG_COUNT шт.)"
+fi
 
-echo "5. Создание суперпользователя..."
+# Создание суперпользователя
+SUPERUSER_EXISTS=$(exec_db "SELECT COUNT(*) FROM users_user WHERE is_superuser = true;" | tr -d ' ' || echo "0")
 
-# Удаляем старого суперпользователя если есть
-exec_db "DELETE FROM users_user WHERE email='admin@example.com';" 2>/dev/null || true
+if [ "$SUPERUSER_EXISTS" = "0" ]; then
+    echo "Создание суперпользователя..."
+
+    exec_backend python manage.py shell << EOF
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+if not User.objects.filter(is_superuser=True).exists():
+    User.objects.create_superuser(
+        email='admin@example.com',
+        username='admin',
+        password='admin123',
+        first_name='Admin',
+        last_name='User'
+    )
+    print('Суперпользователь создан')
+else:
+    print('Суперпользователь уже существует')
+EOF
+
+    echo "Суперпользователь создан"
+else
+    echo "Суперпользователь уже существует"
+fi
+
+echo "Создание тестовых пользователей..."
 
 exec_backend python manage.py shell << EOF
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
-
-User.objects.create_superuser(
-    email='admin@example.com',
-    username='admin',
-    password='admin123',
-    first_name='Admin',
-    last_name='User'
-)
-print('✅ Суперпользователь создан')
-EOF
-
-echo ""
-
-echo "6. Создание тестовых пользователей..."
-
-exec_backend python manage.py shell << EOF
-from django.contrib.auth import get_user_model
-
-User = get_user_model()
-
-# Удаляем старых тестовых пользователей
-User.objects.filter(email__in=['author1@example.com', 'author2@example.com']).delete()
 
 # Создаем первого пользователя
-user1 = User.objects.create_user(
+user1, created = User.objects.get_or_create(
     email='author1@example.com',
-    username='author1',
-    password='password123',
-    first_name='Иван',
-    last_name='Петров'
+    defaults={
+        'username': 'author1',
+        'first_name': 'Иван',
+        'last_name': 'Петров',
+        'is_active': True
+    }
 )
-print('✅ Пользователь author1 создан')
+if created:
+    user1.set_password('password123')
+    user1.save()
+    print('Пользователь author1 создан')
+else:
+    print('Пользователь author1 уже существует')
 
 # Создаем второго пользователя
-user2 = User.objects.create_user(
+user2, created = User.objects.get_or_create(
     email='author2@example.com',
-    username='author2',
-    password='password123',
-    first_name='Мария',
-    last_name='Иванова'
+    defaults={
+        'username': 'author2',
+        'first_name': 'Мария',
+        'last_name': 'Иванова',
+        'is_active': True
+    }
 )
-print('✅ Пользователь author2 создан')
+if created:
+    user2.set_password('password123')
+    user2.save()
+    print('Пользователь author2 создан')
+else:
+    print('Пользователь author2 уже существует')
 EOF
 
-USER_COUNT=$(exec_db "SELECT COUNT(*) FROM users_user;" | tr -d ' ')
-echo "   Пользователей в базе: $USER_COUNT"
-echo ""
+echo "Создание тестовых рецептов..."
 
-echo "7. Создание тестовых рецептов..."
-
-# Создаем тестовое изображение (1x1 прозрачный PNG)
+# Тестовое изображение (1x1 прозрачный PNG в base64)
 TEST_IMAGE="iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
 
 exec_backend python manage.py shell << EOF
@@ -186,176 +179,185 @@ import base64
 from django.core.files.base import ContentFile
 from django.contrib.auth import get_user_model
 from recipes.models import Recipe, Ingredient, Tag, IngredientInRecipe
-import os
+from django.utils import timezone
+from django.db import connection
 
 User = get_user_model()
 
-# Получаем пользователей
-try:
-    author1 = User.objects.get(email='author1@example.com')
-    author2 = User.objects.get(email='author2@example.com')
-except User.DoesNotExist:
-    print('❌ Пользователи не найдены')
-    exit()
-
-# Получаем теги
-tags = {tag.slug: tag for tag in Tag.objects.all()}
-if not tags:
-    print('❌ Теги не найдены')
-    exit()
-
-# Получаем ингредиенты
-ingredients = list(Ingredient.objects.all())
-if len(ingredients) < 10:
-    print('❌ Недостаточно ингредиентов')
-    exit()
-
-# Создаем изображение
+# Функция для создания тестового изображения
 def get_test_image():
     return ContentFile(
         base64.b64decode('$TEST_IMAGE'),
         name='test.png'
     )
 
-# Рецепты для первого пользователя
+# Получаем пользователей
+try:
+    author1 = User.objects.get(email='author1@example.com')
+    author2 = User.objects.get(email='author2@example.com')
+except User.DoesNotExist:
+    print('Пользователи не найдены')
+    exit()
+
+# Получаем теги
+tags = list(Tag.objects.all())
+if not tags:
+    print('Теги не найдены')
+    exit()
+
+# Получаем ингредиенты
+ingredients = list(Ingredient.objects.all()[:20])
+if len(ingredients) < 3:
+    print('Недостаточно ингредиентов')
+    exit()
+
+# Создаем рецепты для первого пользователя
 recipes_for_user1 = [
     {
         'name': 'Борщ',
-        'text': 'Классический украинский борщ с мясом и свеклой',
+        'text': 'Классический борщ с мясом и свеклой',
         'cooking_time': 90,
-        'tags': ['soup', 'dinner'],
+        'tags': [t for t in tags if t.slug in ['dinner']],
         'ingredients': [
-            (ingredients[0], 500),  # Свекла
-            (ingredients[1], 300),  # Картофель
-            (ingredients[2], 200),  # Морковь
-            (ingredients[3], 300),  # Лук
-            (ingredients[4], 400),  # Мясо
+            {'ingredient': ingredients[0], 'amount': 500},
+            {'ingredient': ingredients[1], 'amount': 300},
+            {'ingredient': ingredients[2], 'amount': 200},
+            {'ingredient': ingredients[3], 'amount': 300},
+            {'ingredient': ingredients[4], 'amount': 400},
         ]
     },
     {
         'name': 'Салат Цезарь',
-        'text': 'Популярный салат с курицей и соусом',
+        'text': 'Классический салат с курицей и соусом',
         'cooking_time': 30,
-        'tags': ['salad', 'lunch'],
+        'tags': [t for t in tags if t.slug in ['lunch']],
         'ingredients': [
-            (ingredients[5], 300),  # Курица
-            (ingredients[6], 200),  # Салат
-            (ingredients[7], 100),  # Сухарики
-            (ingredients[8], 100),  # Сыр
+            {'ingredient': ingredients[5], 'amount': 300},
+            {'ingredient': ingredients[6], 'amount': 200},
+            {'ingredient': ingredients[7], 'amount': 100},
+            {'ingredient': ingredients[8], 'amount': 100},
         ]
     },
     {
-        'name': 'Омлет',
-        'text': 'Пышный омлет с овощами',
+        'name': 'Омлет с сыром',
+        'text': 'Пышный омлет с сыром на завтрак',
         'cooking_time': 15,
-        'tags': ['breakfast'],
+        'tags': [t for t in tags if t.slug in ['breakfast']],
         'ingredients': [
-            (ingredients[9], 4),    # Яйца
-            (ingredients[10], 100), # Молоко
-            (ingredients[11], 100), # Помидоры
-            (ingredients[12], 50),  # Зелень
+            {'ingredient': ingredients[9], 'amount': 4},
+            {'ingredient': ingredients[10], 'amount': 100},
+            {'ingredient': ingredients[11], 'amount': 100},
+            {'ingredient': ingredients[12], 'amount': 50},
         ]
     },
     {
-        'name': 'Шарлотка',
-        'text': 'Яблочный пирог',
+        'name': 'Шарлотка с яблоками',
+        'text': 'Простой и вкусный яблочный пирог',
         'cooking_time': 60,
-        'tags': ['dessert', 'baking'],
+        'tags': [t for t in tags if t.slug in ['dessert']],
         'ingredients': [
-            (ingredients[13], 200), # Мука
-            (ingredients[14], 200), # Сахар
-            (ingredients[15], 3),   # Яйца
-            (ingredients[16], 400), # Яблоки
+            {'ingredient': ingredients[13], 'amount': 200},
+            {'ingredient': ingredients[14], 'amount': 200},
+            {'ingredient': ingredients[15], 'amount': 3},
+            {'ingredient': ingredients[16], 'amount': 400},
         ]
     },
 ]
 
-# Рецепты для второго пользователя
+# Создаем рецепты для второго пользователя
 recipes_for_user2 = [
     {
-        'name': 'Гречка по-купечески',
-        'text': 'Гречка с мясом и овощами',
+        'name': 'Гречка с грибами',
+        'text': 'Гречневая каша с жареными грибами',
         'cooking_time': 50,
-        'tags': ['dinner'],
+        'tags': [t for t in tags if t.slug in ['dinner']],
         'ingredients': [
-            (ingredients[0], 300),  # Гречка
-            (ingredients[1], 400),  # Мясо
-            (ingredients[2], 200),  # Лук
-            (ingredients[3], 200),  # Морковь
+            {'ingredient': ingredients[0], 'amount': 300},
+            {'ingredient': ingredients[1], 'amount': 400},
+            {'ingredient': ingredients[2], 'amount': 200},
+            {'ingredient': ingredients[3], 'amount': 200},
         ]
     },
     {
-        'name': 'Панкейки',
-        'text': 'Американские блинчики',
+        'name': 'Блины тонкие',
+        'text': 'Тонкие блины на молоке',
         'cooking_time': 25,
-        'tags': ['breakfast', 'dessert'],
+        'tags': [t for t in tags if t.slug in ['breakfast']],
         'ingredients': [
-            (ingredients[4], 200),  # Мука
-            (ingredients[5], 50),   # Сахар
-            (ingredients[6], 2),    # Яйца
-            (ingredients[7], 200),  # Молоко
-            (ingredients[8], 50),   # Масло
+            {'ingredient': ingredients[4], 'amount': 200},
+            {'ingredient': ingredients[5], 'amount': 50},
+            {'ingredient': ingredients[6], 'amount': 2},
+            {'ingredient': ingredients[7], 'amount': 200},
+            {'ingredient': ingredients[8], 'amount': 50},
         ]
     },
     {
-        'name': 'Куриный суп',
-        'text': 'Легкий куриный суп с лапшой',
+        'name': 'Куриный суп с лапшой',
+        'text': 'Легкий куриный суп с домашней лапшой',
         'cooking_time': 60,
-        'tags': ['soup', 'lunch'],
+        'tags': [t for t in tags if t.slug in ['lunch']],
         'ingredients': [
-            (ingredients[9], 400),  # Курица
-            (ingredients[10], 200), # Морковь
-            (ingredients[11], 200), # Лук
-            (ingredients[12], 300), # Картофель
-            (ingredients[13], 100), # Лапша
+            {'ingredient': ingredients[9], 'amount': 400},
+            {'ingredient': ingredients[10], 'amount': 200},
+            {'ingredient': ingredients[11], 'amount': 200},
+            {'ingredient': ingredients[12], 'amount': 300},
+            {'ingredient': ingredients[13], 'amount': 100},
         ]
     },
 ]
 
-# Функция создания рецепта
+# Функция для создания рецепта
 def create_recipe(author, recipe_data):
-    recipe = Recipe.objects.create(
+    # Проверяем, существует ли уже такой рецепт
+    if Recipe.objects.filter(name=recipe_data['name'], author=author).exists():
+        print(f'  - Рецепт "{recipe_data["name"]}" уже существует')
+        return None
+    
+    # Создаем объект рецепта
+    recipe = Recipe(
         author=author,
         name=recipe_data['name'],
         text=recipe_data['text'],
         cooking_time=recipe_data['cooking_time'],
-        image=get_test_image()
+        image=get_test_image(),
+        pub_date=timezone.now()
     )
     
+    # Сохраняем рецепт
+    recipe.save()
+    
     # Добавляем теги
-    for slug in recipe_data['tags']:
-        if slug in tags:
-            recipe.tags.add(tags[slug])
+    for tag in recipe_data['tags']:
+        recipe.tags.add(tag)
     
     # Добавляем ингредиенты
-    for ingredient, amount in recipe_data['ingredients']:
+    for ing_data in recipe_data['ingredients']:
         IngredientInRecipe.objects.create(
             recipe=recipe,
-            ingredient=ingredient,
-            amount=amount
+            ingredient=ing_data['ingredient'],
+            amount=ing_data['amount']
         )
     
-    print(f'  ✅ {recipe.name}')
+    print(f'  - Создан рецепт: {recipe.name}')
+    return recipe
 
-# Создаем рецепты
-print('Рецепты author1:')
+# Создаем рецепты для первого пользователя
+print('\nСоздание рецептов для author1:')
 for recipe_data in recipes_for_user1:
     create_recipe(author1, recipe_data)
 
-print('\nРецепты author2:')
+# Создаем рецепты для второго пользователя
+print('\nСоздание рецептов для author2:')
 for recipe_data in recipes_for_user2:
     create_recipe(author2, recipe_data)
 
-print(f'\n✅ Всего создано рецептов: {Recipe.objects.count()}')
+# Проверка итогов
+print(f'\nВсего рецептов в базе: {Recipe.objects.count()}')
+print(f'Рецептов у author1: {author1.recipes.count()}')
+print(f'Рецептов у author2: {author2.recipes.count()}')
 EOF
 
-RECIPE_COUNT=$(exec_db "SELECT COUNT(*) FROM recipes_recipe;" | tr -d ' ')
-echo "   Рецептов в базе: $RECIPE_COUNT"
-echo ""
-
-echo "====================================="
-echo "✅ ПОЛНАЯ ПЕРЕЗАГРУЗКА ЗАВЕРШЕНА"
-echo "====================================="
+echo "Настройка базы данных завершена успешно!"
 echo "Итоги:"
 echo "- Ингредиентов: $(exec_db "SELECT COUNT(*) FROM recipes_ingredient;" | tr -d ' ')"
 echo "- Тегов: $(exec_db "SELECT COUNT(*) FROM recipes_tag;" | tr -d ' ')"
