@@ -39,7 +39,7 @@ class TagAdmin(admin.ModelAdmin):
 
 @admin.register(Recipe)
 class RecipeAdmin(admin.ModelAdmin):
-    """Админка для рецептов."""
+    """Админка рецептов."""
 
     list_display = (
         'name',
